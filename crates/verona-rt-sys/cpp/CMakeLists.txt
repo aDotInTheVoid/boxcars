@@ -11,10 +11,10 @@ set(VERONA_PATH "../../../verona-rt/")
 add_subdirectory(${VERONA_PATH} verona-rt)
 
 find_package(Threads REQUIRED)
-add_library(bindings STATIC bindings.cc)
-target_link_libraries(bindings verona_rt)
+add_library(boxcar_bindings STATIC bindings.cc)
+target_link_libraries(boxcar_bindings verona_rt)
 
 add_executable(playground playground.cc)
 target_link_libraries(playground verona_rt)
 
-install(TARGETS bindings DESTINATION .)
+install(TARGETS boxcar_bindings DESTINATION .)

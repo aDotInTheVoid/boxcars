@@ -1,0 +1,3 @@
+[submodule "verona-rt"]
+	path = verona-rt
+	url = https://github.com/microsoft/verona-rt.git

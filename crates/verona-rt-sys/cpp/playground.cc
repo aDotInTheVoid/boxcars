@@ -29,7 +29,8 @@ void real_main()
 
 int main(int argc, const char* const* argv)
 {
-  SystematicTestHarness harness(argc, argv);
-
-  harness.run(real_main);
+  auto& x = verona::rt::Scheduler::get();
+  x.init(10);
+  auto a = make_cown<int>(101);
+  x.run();
 }

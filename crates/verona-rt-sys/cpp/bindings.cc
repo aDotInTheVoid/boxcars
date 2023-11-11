@@ -1,4 +1,7 @@
 #include <cpp/cown.h>
+#include <cstdint>
+#include <sched/schedulerthread.h>
+
 // #include <cpp/when.h>
 // #include <iostream>
 
@@ -6,6 +9,7 @@ using verona::cpp::acquired_cown;
 using verona::cpp::cown_ptr;
 using verona::cpp::make_cown;
 // using verona::cpp::when;
+using verona::rt::Scheduler;
 using verona::rt::VCown;
 
 struct Account : public VCown<Account>
@@ -22,10 +26,25 @@ struct Account : public VCown<Account>
 
 extern "C"
 {
-  cown_ptr<Account> make_account(int balance, bool frozen)
+  // cown_ptr<Account> make_account(int balance, bool frozen)
+  // {
+  //   static_assert(sizeof(cown_ptr<Account>) == sizeof(Account*));
+
+  //   return make_cown<Account>(balance, frozen);
+  // }
+
+  /// Returns a static global, so always safe AFAIKT.
+  Scheduler& scheduler_get(void)
   {
-    static_assert(sizeof(cown_ptr<Account>) == sizeof(Account*));
-    return make_cown<Account>(balance, frozen);
+    return Scheduler::get();
+  }
+  void scheduler_init(Scheduler& sched, size_t count)
+  {
+    sched.init(count);
+  }
+  void scheduler_run(Scheduler& sched)
+  {
+    sched.run();
   }
 
   // void when_account(cown_ptr<Account> account, use_account func)
@@ -44,7 +63,7 @@ extern "C"
   //   return acc.cown();
   // }
 
-  int zzadd(int a, int b)
+  int32_t boxcars_add(int32_t a, int32_t b)
   {
     return a + b;
   }

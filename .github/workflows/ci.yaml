@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [ trunk ]
+  pull_request:
+    branches: [ trunk ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+    - run: cargo build --all
+    - run: cargo test --all

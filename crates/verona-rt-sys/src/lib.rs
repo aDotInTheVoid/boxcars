@@ -1,7 +1,7 @@
 //! Low level FFI bindings to the [verona runtime](https://github.com/microsoft/verona-rt)
 
-#[repr(C)]
-struct CownPtr(*const ());
+// #[repr(C)]
+// struct CownPtr(*const ());
 
 #[repr(C)]
 #[derive(Clone, Copy)]

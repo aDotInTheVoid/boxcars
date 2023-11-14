@@ -16,6 +16,7 @@ add_subdirectory(${VERONA_PATH} verona-rt)
 find_package(Threads REQUIRED)
 add_library(boxcar_bindings STATIC bindings.cc)
 target_link_libraries(boxcar_bindings verona_rt)
+set_property(TARGET boxcar_bindings PROPERTY CXX_STANDARD 17)
 
 add_executable(playground playground.cc)
 target_link_libraries(playground verona_rt)

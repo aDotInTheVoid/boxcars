@@ -3,6 +3,8 @@
 // #[repr(C)]
 // struct CownPtr(*const ());
 
+use std::mem;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 /// A reference to a `verona::rt::Scheduler`.
@@ -12,6 +14,20 @@
 ///
 /// Create with [`scheduler_get`]
 pub struct Scheduler(*const ());
+
+#[repr(C)]
+/// This is a reference cointed pointer, so embeders shouldn't
+/// implement Copy.
+///
+/// Must not be moved directly over the FFI boundry, as C++ and rust
+/// use different calling conventions.
+pub struct CownPtr(*const ());
+
+impl CownPtr {
+    pub fn lead_address(&self) -> *const () {
+        self.0
+    }
+}
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
@@ -45,6 +61,14 @@ extern "C" {
     /// - Unclear. It's probably a bad idea to call it multiple times without
     ///   re-initializing the schedular.
     pub fn scheduler_run(schedular: Scheduler);
+
+    /// Extreamly racy.
+    pub fn schedular_set_detect_leaks(detect_leaks: bool);
+    pub fn schedular_has_leaks() -> bool;
+
+    pub fn cown_int_new(value: i32, cown: &mut mem::MaybeUninit<CownPtr>);
+    pub fn cown_int_delete(cown: &mut CownPtr);
+    pub fn cown_int_clone(input: &CownPtr, output: &mut mem::MaybeUninit<CownPtr>);
 }
 
 #[test]

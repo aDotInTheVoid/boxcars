@@ -20,19 +20,19 @@ fn get() -> ffi::Scheduler {
 
 static SCHED_LOCK: Mutex<()> = Mutex::new(());
 
+struct DropGuard;
+impl Drop for DropGuard {
+    fn drop(&mut self) {
+        unsafe { ffi::scheduler_run(get()) }
+    }
+}
+
 pub fn with<T>(f: impl FnOnce() -> T) -> T {
     // Note: we don't care if it was poisoned.
     let _lock = SCHED_LOCK.lock();
 
     unsafe {
         ffi::scheduler_init(scheduler_get(), 8);
-    }
-
-    struct DropGuard;
-    impl Drop for DropGuard {
-        fn drop(&mut self) {
-            unsafe { ffi::scheduler_run(get()) }
-        }
     }
 
     // Use a drop guard to clean up scheduler resources even in the case that
@@ -42,6 +42,23 @@ pub fn with<T>(f: impl FnOnce() -> T) -> T {
     drop(dg);
 
     result
+}
+
+pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
+    with::<T>(|| {
+        // SAFETY: We hold the SCHED_LOCK, so can't race.
+        unsafe { ffi::schedular_set_detect_leaks(true) };
+        let result = f();
+
+        unsafe {
+            if ffi::schedular_has_leaks() {
+                // TODO: track caller.
+                panic!("leaks detected");
+            }
+        }
+
+        result
+    })
 }
 
 /// Initialize the schedular with the given number of threads.

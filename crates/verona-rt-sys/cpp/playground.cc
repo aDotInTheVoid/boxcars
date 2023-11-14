@@ -30,7 +30,7 @@ void real_main()
 int main(int argc, const char* const* argv)
 {
   auto& x = verona::rt::Scheduler::get();
-  x.init(10);
+  x.init(1);
   auto a = make_cown<int>(101);
   x.run();
 }

@@ -15,6 +15,8 @@ use std::mem;
 /// Create with [`scheduler_get`]
 pub struct Scheduler(*const ());
 
+pub type UseInt = extern "C" fn(&mut AquiredCown, *const ());
+
 #[repr(C)]
 /// This is a reference cointed pointer, so embeders shouldn't
 /// implement Copy.
@@ -28,6 +30,10 @@ impl CownPtr {
         self.0
     }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AquiredCown(*const ());
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
@@ -69,6 +75,10 @@ extern "C" {
     pub fn cown_int_new(value: i32, cown: &mut mem::MaybeUninit<CownPtr>);
     pub fn cown_int_delete(cown: &mut CownPtr);
     pub fn cown_int_clone(input: &CownPtr, output: &mut mem::MaybeUninit<CownPtr>);
+
+    pub fn cown_int_when1(cown: &CownPtr, func: UseInt, data: *const ());
+    pub fn cown_get_ref(cown: &AquiredCown) -> *mut i32;
+    pub fn cown_get_cown(cown: &AquiredCown, out: &mut mem::MaybeUninit<CownPtr>);
 }
 
 #[test]

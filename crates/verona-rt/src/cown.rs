@@ -11,7 +11,7 @@ use verona_rt_sys as ffi;
 /// You can't return them by value over an FFI boundry, as the ABI will be wrong, and you'll
 /// end up
 
-pub struct CownPtr(ffi::CownPtr);
+pub struct CownPtr(pub(crate) ffi::CownPtr);
 
 impl std::ops::Drop for CownPtr {
     fn drop(&mut self) {

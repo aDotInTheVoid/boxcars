@@ -3,12 +3,13 @@
 #include <cstdint>
 // verona
 #include <cpp/cown.h>
+#include <cpp/when.h>
 #include <sched/schedulerthread.h>
 
 using verona::cpp::acquired_cown;
 using verona::cpp::cown_ptr;
 using verona::cpp::make_cown;
-// using verona::cpp::when;
+using verona::cpp::when;
 using verona::rt::Scheduler;
 using verona::rt::VCown;
 
@@ -21,15 +22,8 @@ using verona::rt::VCown;
 //   bool frozen_;
 // };
 
-// typedef void(use_account(acquired_cown<Account>&));
+typedef void(use_int(acquired_cown<int32_t>& cown, void* data));
 // typedef void(use_accout2(acquired_cown<Account>&, acquired_cown<Account>&));
-
-// template<class T>
-// void* cown_ptr_crimes(cown_ptr<T>* cown_ptr_ref)
-// {
-//   void** foo = std::bit_cast<void**, cown_ptr<T>*>(cown_ptr_ref);
-//   return *foo;
-// }
 
 extern "C"
 {
@@ -82,21 +76,18 @@ extern "C"
     out = in;
   }
 
-  // void when_account(cown_ptr<Account> account, use_account func)
-  // {
-  //   when(account) << [func](auto acc) { func(acc); };
-  // }
-
-  // void
-  // when_account2(cown_ptr<Account> a1, cown_ptr<Account> a2, use_accout2 func)
-  // {
-  //   when(a1, a2) << [=](auto a1, auto a2) { func(a1, a2); };
-  // }
-
-  // cown_ptr<Account> cown(acquired_cown<Account> acc)
-  // {
-  //   return acc.cown();
-  // }
+  void cown_int_when1(const cown_ptr<int32_t>& cown, use_int func, void* data)
+  {
+    when(cown) << [=](auto cown) { func(cown, data); };
+  }
+  int32_t& cown_get_ref(acquired_cown<int32_t> const& cown)
+  {
+    return cown.get_ref();
+  }
+  void cown_get_cown(acquired_cown<int32_t> const& cown, cown_ptr<int32_t>& out)
+  {
+    out = cown.cown();
+  }
 
   int32_t boxcars_add(int32_t a, int32_t b)
   {

@@ -5,6 +5,10 @@ fn main() {
         cmake_build.generator("Ninja");
     }
 
+    if cfg!(feature = "systematic_testing") {
+        cmake_build.define("USE_SYSTEMATIC_TESTING", "ON");
+    }
+
     let dst = cmake_build.build();
 
     println!("cargo:rustc-link-search=native={}", dst.display());

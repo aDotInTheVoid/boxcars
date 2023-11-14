@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 verona-rt-sys = { version = "0.1.0", path = "../verona-rt-sys" }
+
+[features]
+systematic_testing = ["verona-rt-sys/systematic_testing"]

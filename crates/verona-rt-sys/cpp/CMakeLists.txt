@@ -11,7 +11,9 @@ endif()
 
 set(VERONA_PATH "../../../verona-rt/")
 
+
 add_subdirectory(${VERONA_PATH} verona-rt)
+
 
 find_package(Threads REQUIRED)
 add_library(boxcar_bindings STATIC bindings.cc)

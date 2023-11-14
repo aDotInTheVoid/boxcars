@@ -1,6 +1,7 @@
 // std
 #include <bit>
 #include <cstdint>
+#include <string_view>
 // verona
 #include <cpp/cown.h>
 #include <cpp/when.h>
@@ -51,9 +52,19 @@ extern "C"
   }
   bool schedular_has_leaks()
   {
-    bool result;
-    snmalloc::debug_check_empty<snmalloc::Alloc::Config>(&result);
-    return result;
+    bool is_ok;
+    snmalloc::debug_check_empty<snmalloc::Alloc::Config>(&is_ok);
+    return !is_ok;
+  }
+
+  void enable_logging()
+  {
+    Logging::enable_logging();
+  }
+
+  void boxcar_log(char* ptr, size_t len)
+  {
+    Logging::cout() << std::string_view(ptr, len) << Logging::endl;
   }
 
   /*

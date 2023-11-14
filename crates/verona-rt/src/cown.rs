@@ -77,11 +77,16 @@ mod tests {
     }
 
     #[test]
-    fn lead_detector_works() {
-        // TODO: This should panic.
+    fn leak_detector_new() {
+        unsafe {
+            ffi::enable_logging();
+        }
+
         with_leak_detector(|| {
-            let v = CownPtr::new(666);
-            mem::forget(v);
+            let x = CownPtr::new(1010);
+            let y = x.clone();
+            drop(x);
+            drop(y);
         });
     }
 }

@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, ops};
+use std::{marker::PhantomData, mem, ops};
 
 use verona_rt_sys as ffi;
 
@@ -6,7 +6,7 @@ use crate::cown::CownPtr;
 
 extern "C" fn call_trampoline<'a>(aq: &mut ffi::AquiredCown, data: *const ()) {
     unsafe {
-        let func: IntFn = std::mem::transmute(data);
+        let func = mem::transmute::<_, IntFn>(data);
         func(AquiredCown {
             ptr: *aq,
             marker: PhantomData,

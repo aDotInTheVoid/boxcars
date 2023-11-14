@@ -27,38 +27,43 @@ impl Drop for DropGuard {
     }
 }
 
-pub fn with<T>(f: impl FnOnce() -> T) -> T {
-    // Note: we don't care if it was poisoned.
-    let _lock = SCHED_LOCK.lock();
+pub fn with<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    with_inner(f, true)
+}
+
+pub fn with_inner<T, F: FnOnce() -> T>(f: F, detect_leaks: bool) -> T {
+    let lock = SCHED_LOCK.lock();
 
     unsafe {
-        ffi::scheduler_init(scheduler_get(), 8);
+        ffi::scheduler_init(scheduler_get(), 1);
+
+        if detect_leaks {
+            ffi::schedular_set_detect_leaks(true);
+        }
     }
 
     // Use a drop guard to clean up scheduler resources even in the case that
     // The closure panics.
     let dg = DropGuard;
     let result = f();
-    drop(dg);
+    drop(dg); // Calls Scheduler.run
+
+    if detect_leaks {
+        unsafe {
+            if ffi::schedular_has_leaks() {
+                panic!("leaks detected");
+            }
+            ffi::schedular_set_detect_leaks(false)
+        }
+    }
+
+    drop(lock);
 
     result
 }
 
 pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
-    with::<T>(|| {
-        // SAFETY: We hold the SCHED_LOCK, so can't race.
-        unsafe { ffi::schedular_set_detect_leaks(true) };
-        let result = f();
-
-        unsafe {
-            if ffi::schedular_has_leaks() {
-                // TODO: track caller.
-                panic!("leaks detected");
-            }
-        }
-
-        result
-    })
+    with_inner(f, true)
 }
 
 /// Initialize the schedular with the given number of threads.
@@ -76,6 +81,8 @@ pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
 
 #[cfg(test)]
 mod tests {
+    use crate::cown;
+
     use super::*;
 
     #[test]
@@ -111,4 +118,19 @@ mod tests {
             }
         })
     }
+
+    // #[test]
+    // fn concurrent_leak_detector() {
+    //     fn do_a_clone() {
+    //         _ = cown::CownPtr::new(101).clone();
+    //     }
+
+    //     for _ in 0..1000 {
+    //         let t1 = std::thread::spawn(|| with(|| do_a_clone()));
+    //         let t3 = std::thread::spawn(|| with_leak_detector(|| do_a_clone()));
+
+    //         t1.join().unwrap();
+    //         t3.join().unwrap();
+    //     }
+    // }
 }

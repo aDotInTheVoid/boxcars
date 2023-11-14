@@ -62,9 +62,9 @@ extern "C"
     Logging::enable_logging();
   }
 
-  void boxcar_log(char* ptr, size_t len)
+  void boxcar_log(const char* str, size_t len)
   {
-    Logging::cout() << std::string_view(ptr, len) << Logging::endl;
+    Logging::cout() << std::string_view(str, len) << Logging::endl;
   }
 
   /*

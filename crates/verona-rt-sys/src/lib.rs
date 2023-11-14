@@ -79,6 +79,9 @@ extern "C" {
     pub fn cown_int_when1(cown: &CownPtr, func: UseInt, data: *const ());
     pub fn cown_get_ref(cown: &AquiredCown) -> *mut i32;
     pub fn cown_get_cown(cown: &AquiredCown, out: &mut mem::MaybeUninit<CownPtr>);
+
+    pub fn enable_logging();
+    pub fn boxcar_log(ptr: *const u8, len: usize);
 }
 
 #[test]

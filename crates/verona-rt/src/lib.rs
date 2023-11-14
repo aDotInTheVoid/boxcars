@@ -6,5 +6,6 @@
 //!    you'll have a bad time.
 
 pub mod cown;
+pub mod log;
 pub mod scheduler;
 pub mod when;

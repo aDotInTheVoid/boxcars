@@ -57,14 +57,34 @@ extern "C"
     return !is_ok;
   }
 
+  /*
+   * Logging
+   */
   void enable_logging()
   {
     Logging::enable_logging();
   }
-
-  void boxcar_log(const char* str, size_t len)
+  void boxcar_log_cstr(const char* str)
   {
-    Logging::cout() << std::string_view(str, len) << Logging::endl;
+    Logging::cout() << str;
+  }
+  void boxcar_log_endl()
+  {
+    Logging::cout() << std::endl;
+  }
+  // Need to ensure rust's `usize` is right.
+  static_assert(sizeof(size_t) == sizeof(ptrdiff_t));
+  void boxcar_log_usize(size_t v)
+  {
+    Logging::cout() << v;
+  }
+  void boxcar_log_ptr(void* p)
+  {
+    Logging::cout() << p;
+  }
+  void dump_flight_recorder()
+  {
+    Logging::SysLog::dump_flight_recorder();
   }
 
   /*

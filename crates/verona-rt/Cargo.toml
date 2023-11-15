@@ -10,3 +10,7 @@ verona-rt-sys = { version = "0.1.0", path = "../verona-rt-sys" }
 
 [features]
 systematic_testing = ["verona-rt-sys/systematic_testing"]
+flight_recorder = ["verona-rt-sys/flight_recorder"]
+
+[dev-dependencies]
+cstr = "0.2.11"

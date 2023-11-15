@@ -81,7 +81,11 @@ extern "C" {
     pub fn cown_get_cown(cown: &AquiredCown, out: &mut mem::MaybeUninit<CownPtr>);
 
     pub fn enable_logging();
-    pub fn boxcar_log(ptr: *const u8, len: usize);
+    pub fn dump_flight_recorder();
+
+    pub fn boxcar_log_cstr(ptr: *const std::ffi::c_char);
+    pub fn boxcar_log_usize(n: usize);
+    pub fn boxcar_log_ptr(p: *const ());
 }
 
 #[test]

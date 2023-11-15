@@ -8,6 +8,9 @@ fn main() {
     if cfg!(feature = "systematic_testing") {
         cmake_build.define("USE_SYSTEMATIC_TESTING", "ON");
     }
+    if cfg!(feature = "flight_recorder") {
+        cmake_build.define("USE_CRASH_LOGGING", "ON");
+    }
 
     // https://github.com/aDotInTheVoid/boxcars/issues/1#issuecomment-1812070337
     cmake_build.define("VERONA_RT_ONLY_HEADER_LIBRARY", "ON");

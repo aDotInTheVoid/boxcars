@@ -1,4 +1,6 @@
-pub fn log(val: &str) {
+// TODO: Richer logging abstractions.
+
+pub fn log(val: &'static std::ffi::CStr) {
     // TODO: Does this race?
-    unsafe { verona_rt_sys::boxcar_log(val.as_ptr(), val.len()) }
+    unsafe { verona_rt_sys::boxcar_log_cstr(val.as_ptr()) }
 }

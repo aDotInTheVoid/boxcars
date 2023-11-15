@@ -13,3 +13,4 @@ cmake = "0.1.50"
 
 [features]
 systematic_testing = []
+flight_recorder = []

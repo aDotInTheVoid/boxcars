@@ -86,6 +86,7 @@ extern "C" {
     pub fn boxcar_log_cstr(ptr: *const std::ffi::c_char);
     pub fn boxcar_log_usize(n: usize);
     pub fn boxcar_log_ptr(p: *const ());
+    pub fn boxcar_log_endl();
 }
 
 #[test]

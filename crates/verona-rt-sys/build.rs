@@ -9,6 +9,9 @@ fn main() {
         cmake_build.define("USE_SYSTEMATIC_TESTING", "ON");
     }
 
+    // https://github.com/aDotInTheVoid/boxcars/issues/1#issuecomment-1812070337
+    cmake_build.define("VERONA_RT_ONLY_HEADER_LIBRARY", "ON");
+
     let dst = cmake_build.build();
 
     println!("cargo:rustc-link-search=native={}", dst.display());

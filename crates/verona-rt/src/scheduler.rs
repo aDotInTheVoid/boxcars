@@ -66,23 +66,8 @@ pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
     with_inner(f, true)
 }
 
-/// Initialize the schedular with the given number of threads.
-///
-/// ## Safety
-///
-/// The global
-// pub unsafe fn init(n_threads: NonZeroUsize) {
-//     ffi::scheduler_init(get(), n_threads.get())
-// }
-
-// pub unsafe fn run() {
-//     ffi::scheduler_run(get())
-// }
-
 #[cfg(test)]
 mod tests {
-    use crate::cown;
-
     use super::*;
 
     #[test]
@@ -104,6 +89,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "https://github.com/aDotInTheVoid/boxcars/issues/4"]
     fn panic_safe() {
         std::thread::scope(|s| {
             for _ in 0..10 {

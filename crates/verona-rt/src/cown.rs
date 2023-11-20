@@ -1,4 +1,10 @@
-use std::{marker::PhantomData, mem, ptr};
+use core::fmt;
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+    mem::{self, MaybeUninit},
+    ptr,
+};
 
 use verona_rt_sys as ffi;
 
@@ -20,38 +26,55 @@ use verona_rt_sys as ffi;
 // +------------------------------------------+
 
 pub struct CownPtr<T> {
-    pub(crate) ptr: ffi::CownPtr,
+    pub(crate) cown_ptr: ffi::CownPtr,
     // TODO: Is this right wrt send/sync.
-    _marker: PhantomData<CownData<T>>,
-}
-
-impl<T> CownPtr<T> {
-    fn cown_data(&self) -> *mut CownData<T> {
-        self.ptr.addr() as _
-    }
-
-    /// Safety: lol
-    #[cfg(test)]
-    unsafe fn yolo_data(&mut self) -> &mut T {
-        &mut (*self.cown_data()).data
-    }
+    _marker: PhantomData<T>,
 }
 
 #[repr(C)]
-struct ActualCown {
-    _marker: std::mem::MaybeUninit<[u64; 4]>,
-}
-
-#[repr(C)]
-pub(crate) struct CownData<T> {
+/// It's never safe to dereference this type, or even to construct one.
+pub(crate) struct CownDataToxic<T> {
     // Must be first, so we can convert pointers between the two.
     cown: ActualCown,
     pub data: T,
 }
 
+pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
+    debug_assert!(!ptr.is_null());
+    debug_assert!((ptr as usize) & 15 == 0, "{ptr:p} not 16 bit aligned");
+
+    let p = ptr as *mut CownDataToxic<T>;
+
+    unsafe { ptr::addr_of_mut!((*p).data) }
+}
+
+impl<T> CownPtr<T> {
+    fn data_ptr(&self) -> *mut T {
+        cown_to_data(self.cown_ptr.addr())
+    }
+
+    /// Safety: lol
+    // #[cfg(test)]
+    pub unsafe fn yolo_data(&mut self) -> &mut T {
+        &mut *(self.data_ptr() as *mut T)
+    }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct ActualCown {
+    _marker: MaybeUninit<[*const (); 4]>,
+}
+
+impl<T> fmt::Pointer for CownPtr<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Pointer::fmt(&self.cown_ptr.addr(), f)
+    }
+}
+
 impl<T> std::ops::Drop for CownPtr<T> {
     fn drop(&mut self) {
-        unsafe { ffi::boxcar_cownptr_drop(&mut self.ptr) };
+        unsafe { ffi::boxcar_cownptr_drop(&mut self.cown_ptr) };
     }
 }
 
@@ -59,9 +82,9 @@ impl<T> Clone for crate::cown::CownPtr<T> {
     fn clone(&self) -> Self {
         unsafe {
             let mut new = mem::zeroed();
-            ffi::boxcar_cownptr_clone(&self.ptr, &mut new);
+            ffi::boxcar_cownptr_clone(&self.cown_ptr, &mut new);
             Self {
-                ptr: new,
+                cown_ptr: new,
                 _marker: PhantomData,
             }
         }
@@ -69,10 +92,9 @@ impl<T> Clone for crate::cown::CownPtr<T> {
 }
 
 extern "C" fn drop_glue<T>(cown: *mut ()) {
-    let cown = cown as *mut CownData<T>;
-
+    let data_ptr = cown_to_data::<T>(cown);
     unsafe {
-        ptr::drop_in_place(ptr::addr_of_mut!((*cown).data));
+        ptr::drop_in_place(data_ptr);
     }
 }
 
@@ -85,22 +107,17 @@ impl<T> CownPtr<T> {
             // Luckely for us, `nullptr` is a valid value for a cown_ptr, and we can create one easily.
             let mut cown_ptr = mem::zeroed();
 
-            ffi::boxcar_cownptr_new(
-                // TODO: Why is this needed? AAAH. +8 doesn't work.
-                std::mem::size_of::<CownData<T>>() + 9,
-                drop_glue::<T>,
-                &mut cown_ptr,
-            );
+            let theretical_size = std::mem::size_of::<CownDataToxic<T>>();
+            // TODO: Figure out why this helps.
+            let memory_size = theretical_size + 9;
+
+            ffi::boxcar_cownptr_new(memory_size, drop_glue::<T>, &mut cown_ptr);
 
             let this = Self {
-                ptr: cown_ptr,
+                cown_ptr,
                 _marker: PhantomData,
             };
-
-            let data_ptr = ptr::addr_of_mut!((*this.cown_data()).data);
-
-            data_ptr.write(value);
-
+            ptr::write(this.data_ptr(), value);
             this
         }
     }
@@ -119,7 +136,7 @@ mod tests {
         with_leak_detector(|| {
             let v = CownPtr::new(10);
             let v2 = v.clone();
-            assert_eq!(v.ptr.addr(), v2.ptr.addr());
+            assert_eq!(v.cown_ptr.addr(), v2.cown_ptr.addr());
             drop(v);
             // TODO: Refcount check.
             drop(v2);
@@ -146,7 +163,7 @@ mod tests {
         with(|| {
             let v1 = CownPtr::new(10);
             let v2 = v1.clone();
-            assert_ne!(v2.ptr.addr(), ptr::null_mut());
+            assert_ne!(v2.cown_ptr.addr(), ptr::null_mut());
         })
     }
 
@@ -182,7 +199,7 @@ mod tests {
     fn read_modify_write() {
         scheduler::with_leak_detector(|| {
             let mut c = CownPtr::new([0; 100]);
-            assert_ne!(c.ptr.addr(), ptr::null_mut());
+            assert_ne!(c.cown_ptr.addr(), ptr::null_mut());
             {
                 let c = unsafe { c.yolo_data() };
                 for (n, el) in c.iter_mut().enumerate() {
@@ -192,7 +209,7 @@ mod tests {
             }
 
             let mut c1 = c.clone();
-            assert_ne!(c1.ptr.addr(), ptr::null_mut());
+            assert_ne!(c1.cown_ptr.addr(), ptr::null_mut());
 
             {
                 for (n, el) in unsafe { c1.yolo_data() }.iter_mut().enumerate() {
@@ -202,7 +219,7 @@ mod tests {
             }
 
             let mut c2 = c.clone();
-            assert_ne!(c2.ptr.addr(), ptr::null_mut());
+            assert_ne!(c2.cown_ptr.addr(), ptr::null_mut());
             {
                 for (n, el) in unsafe { c2.yolo_data() }.iter().enumerate() {
                     assert_eq!(*el, n * 2);

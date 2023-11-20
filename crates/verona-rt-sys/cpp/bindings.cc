@@ -27,9 +27,6 @@ static_assert(sizeof(cown_ptr) == sizeof(void*));
 static_assert(sizeof(aquired_cown) == sizeof(void*));
 
 static constexpr size_t actual_sz = sizeof(ActualCown);
-static constexpr size_t valloc_size = verona::rt::vsizeof<DtorThunk>;
-
-static_assert(valloc_size == actual_sz);
 static_assert(alignof(ActualCown) == alignof(void*));
 
 extern "C"

@@ -2,7 +2,7 @@ use std::{marker::PhantomData, mem, ops};
 
 use verona_rt_sys as ffi;
 
-use crate::cown::{CownData, CownPtr};
+use crate::cown::CownPtr;
 
 pub struct AquiredCown<'a, T> {
     // TODO: As an optimization, point to the `T`, and roll the pointer back to
@@ -12,8 +12,8 @@ pub struct AquiredCown<'a, T> {
 }
 
 impl<'a, T> AquiredCown<'a, T> {
-    fn cown_ptr(&self) -> *mut CownData<T> {
-        self.ptr.addr() as _
+    fn data_ptr(&self) -> *mut T {
+        super::cown::cown_to_data(self.ptr.addr())
     }
 }
 
@@ -21,13 +21,13 @@ impl<'a, T> ops::Deref for AquiredCown<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &(*self.cown_ptr()).data }
+        unsafe { &*self.data_ptr() }
     }
 }
 
 impl<'a, T> ops::DerefMut for AquiredCown<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut (*self.cown_ptr()).data }
+        unsafe { &mut *self.data_ptr() }
     }
 }
 
@@ -62,18 +62,22 @@ pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
     let trampoline = trampoline1::<T>;
 
     unsafe {
-        ffi::boxcar_when1(&cown.ptr, trampoline, f as _);
+        ffi::boxcar_when1(&cown.cown_ptr, trampoline, f as _);
     }
 }
 
 pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
     // So we don't let the func aquire the same cown twice.
     // See also: https://github.com/microsoft/verona-rt/pull/30
-    assert_ne!(c1.ptr.addr(), c2.ptr.addr(), "used the same cown twice");
+    assert_ne!(
+        c1.cown_ptr.addr(),
+        c2.cown_ptr.addr(),
+        "used the same cown twice"
+    );
 
     let trampoline = trampoline2::<T, U>;
     unsafe {
-        ffi::boxcar_when2(&c1.ptr, &c2.ptr, trampoline, f as _);
+        ffi::boxcar_when2(&c1.cown_ptr, &c2.cown_ptr, trampoline, f as _);
     }
 }
 

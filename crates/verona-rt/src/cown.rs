@@ -20,14 +20,14 @@ use verona_rt_sys as ffi;
 // +------------------------------------------+
 
 pub struct CownPtr<T> {
-    ptr: ffi::CownPtr,
+    pub(crate) ptr: ffi::CownPtr,
     // TODO: Is this right wrt send/sync.
     _marker: PhantomData<CownData<T>>,
 }
 
 impl<T> CownPtr<T> {
     fn cown_data(&self) -> *mut CownData<T> {
-        self.ptr.lead_address() as _
+        self.ptr.addr() as _
     }
 
     /// Safety: lol
@@ -43,10 +43,10 @@ struct ActualCown {
 }
 
 #[repr(C)]
-struct CownData<T> {
+pub(crate) struct CownData<T> {
     // Must be first, so we can convert pointers between the two.
     cown: ActualCown,
-    data: T,
+    pub data: T,
 }
 
 impl<T> std::ops::Drop for CownPtr<T> {
@@ -68,7 +68,7 @@ impl<T> Clone for crate::cown::CownPtr<T> {
     }
 }
 
-extern "C" fn dummy_drop(ptr: *const ()) {
+extern "C" fn dummy_drop(ptr: *mut ()) {
     dbg!(ptr);
 }
 
@@ -113,7 +113,7 @@ mod tests {
         with_leak_detector(|| {
             let v = CownPtr::new(10);
             let v2 = v.clone();
-            assert_eq!(v.ptr.lead_address(), v2.ptr.lead_address());
+            assert_eq!(v.ptr.addr(), v2.ptr.addr());
             drop(v);
             // TODO: Refcount check.
             drop(v2);
@@ -140,7 +140,7 @@ mod tests {
         with(|| {
             let v1 = CownPtr::new(10);
             let v2 = v1.clone();
-            assert_ne!(v2.ptr.lead_address(), ptr::null());
+            assert_ne!(v2.ptr.addr(), ptr::null_mut());
         })
     }
 
@@ -176,7 +176,7 @@ mod tests {
     fn read_modify_write() {
         scheduler::with_leak_detector(|| {
             let mut c = CownPtr::new([0; 100]);
-            assert_ne!(c.ptr.lead_address(), ptr::null());
+            assert_ne!(c.ptr.addr(), ptr::null_mut());
             {
                 let c = unsafe { c.yolo_data() };
                 for (n, el) in c.iter_mut().enumerate() {
@@ -186,7 +186,7 @@ mod tests {
             }
 
             let mut c1 = c.clone();
-            assert_ne!(c1.ptr.lead_address(), ptr::null());
+            assert_ne!(c1.ptr.addr(), ptr::null_mut());
 
             {
                 for (n, el) in unsafe { c1.yolo_data() }.iter_mut().enumerate() {
@@ -196,7 +196,7 @@ mod tests {
             }
 
             let mut c2 = c.clone();
-            assert_ne!(c2.ptr.lead_address(), ptr::null());
+            assert_ne!(c2.ptr.addr(), ptr::null_mut());
             {
                 for (n, el) in unsafe { c2.yolo_data() }.iter().enumerate() {
                     assert_eq!(*el, n * 2);

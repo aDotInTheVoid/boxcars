@@ -118,6 +118,12 @@ extern "C"
     *allign = alignof(ActualCown);
   }
 
+  void
+  boxcar_when1(cown_ptr* cown, void (*func)(aquired_cown*, void*), void* data)
+  {
+    when(*cown) << [=](aquired_cown acq) { func(&acq, data); };
+  }
+
   int32_t boxcars_add(int32_t a, int32_t b)
   {
     return a + b;

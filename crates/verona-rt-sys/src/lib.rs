@@ -16,19 +16,24 @@ pub struct Scheduler(*const ());
 ///
 /// Must not be moved directly over the FFI boundry, as C++ and rust
 /// use different calling conventions.
-pub struct CownPtr(*const ());
+pub struct CownPtr(*mut ());
 
 impl CownPtr {
-    pub fn lead_address(&self) -> *const () {
+    pub fn addr(&self) -> *mut () {
+        self.0
+    }
+}
+impl AquiredCown {
+    pub fn addr(&self) -> *mut () {
         self.0
     }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct AquiredCown(*const ());
+pub struct AquiredCown(*mut ());
 
-pub type Dtor = extern "C" fn(*const ());
+pub type Dtor = extern "C" fn(*mut ());
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
@@ -73,6 +78,12 @@ extern "C" {
     pub fn boxcar_aquiredcown_cown(input: &AquiredCown, out: &mut CownPtr);
 
     pub fn boxcar_actualcown_info(size: &mut usize, align: &mut usize);
+
+    pub fn boxcar_when1(
+        cown: &CownPtr,
+        func: extern "C" fn(&mut AquiredCown, *mut ()),
+        data: *mut (),
+    );
 
     pub fn enable_logging();
     pub fn dump_flight_recorder();

@@ -1,10 +1,5 @@
 //! Low level FFI bindings to the [verona runtime](https://github.com/microsoft/verona-rt)
 
-// #[repr(C)]
-// struct CownPtr(*const ());
-
-use std::mem;
-
 #[repr(C)]
 #[derive(Clone, Copy)]
 /// A reference to a `verona::rt::Scheduler`.
@@ -14,8 +9,6 @@ use std::mem;
 ///
 /// Create with [`scheduler_get`]
 pub struct Scheduler(*const ());
-
-pub type UseInt = extern "C" fn(&mut AquiredCown, *const ());
 
 #[repr(C)]
 /// This is a reference cointed pointer, so embeders shouldn't
@@ -34,6 +27,8 @@ impl CownPtr {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct AquiredCown(*const ());
+
+pub type Dtor = extern "C" fn(*const ());
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
@@ -72,13 +67,10 @@ extern "C" {
     pub fn schedular_set_detect_leaks(detect_leaks: bool);
     pub fn schedular_has_leaks() -> bool;
 
-    pub fn cown_int_new(value: i32, cown: &mut mem::MaybeUninit<CownPtr>);
-    pub fn cown_int_delete(cown: &mut CownPtr);
-    pub fn cown_int_clone(input: &CownPtr, output: &mut mem::MaybeUninit<CownPtr>);
-
-    pub fn cown_int_when1(cown: &CownPtr, func: UseInt, data: *const ());
-    pub fn cown_get_ref(cown: &AquiredCown) -> *mut i32;
-    pub fn cown_get_cown(cown: &AquiredCown, out: &mut mem::MaybeUninit<CownPtr>);
+    pub fn boxcar_cownptr_clone(input: &CownPtr, output: &mut CownPtr);
+    pub fn boxcar_cownptr_drop(ptr: &mut CownPtr);
+    pub fn boxcar_cownptr_new(size: usize, dtor: Dtor, output: &mut CownPtr);
+    pub fn boxcar_aquiredcown_cown(input: &AquiredCown, out: &mut CownPtr);
 
     pub fn enable_logging();
     pub fn dump_flight_recorder();

@@ -72,6 +72,8 @@ extern "C" {
     pub fn boxcar_cownptr_new(size: usize, dtor: Dtor, output: &mut CownPtr);
     pub fn boxcar_aquiredcown_cown(input: &AquiredCown, out: &mut CownPtr);
 
+    pub fn boxcar_actualcown_info(size: &mut usize, align: &mut usize);
+
     pub fn enable_logging();
     pub fn dump_flight_recorder();
 

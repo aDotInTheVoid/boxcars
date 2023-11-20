@@ -96,7 +96,7 @@ extern "C"
    */
   void boxcar_cownptr_clone(cown_ptr* in, cown_ptr* out)
   {
-    *in = *out;
+    *out = *in;
   }
   void boxcar_cownptr_drop(cown_ptr* ptr)
   {
@@ -110,6 +110,12 @@ extern "C"
   void boxcar_aquiredcown_cown(aquired_cown* ptr, cown_ptr* out)
   {
     *out = ptr->cown();
+  }
+
+  void boxcar_actualcown_info(size_t* size, size_t* allign)
+  {
+    *size = sizeof(ActualCown);
+    *allign = alignof(ActualCown);
   }
 
   int32_t boxcars_add(int32_t a, int32_t b)

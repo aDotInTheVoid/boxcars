@@ -29,6 +29,12 @@ impl<T> CownPtr<T> {
     fn cown_data(&self) -> *mut CownData<T> {
         self.ptr.lead_address() as _
     }
+
+    /// Safety: lol
+    #[cfg(test)]
+    unsafe fn yolo_data(&mut self) -> &mut T {
+        &mut (*self.cown_data()).data
+    }
 }
 
 #[repr(C)]
@@ -76,7 +82,7 @@ impl<T> CownPtr<T> {
             let mut cown_ptr = mem::zeroed();
 
             ffi::boxcar_cownptr_new(
-                // Why does this +9 fix everything aaaaaah.
+                // TODO: Why is this needed? AAAH. +8 doesn't work.
                 std::mem::size_of::<CownData<T>>() + 9,
                 dummy_drop,
                 &mut cown_ptr,
@@ -100,7 +106,7 @@ impl<T> CownPtr<T> {
 mod tests {
     use super::*;
 
-    use crate::scheduler::{with, with_leak_detector};
+    use crate::scheduler::{self, with, with_leak_detector};
 
     #[test]
     fn new() {
@@ -130,6 +136,15 @@ mod tests {
     }
 
     #[test]
+    fn clone_notnull() {
+        with(|| {
+            let v1 = CownPtr::new(10);
+            let v2 = v1.clone();
+            assert_ne!(v2.ptr.lead_address(), ptr::null());
+        })
+    }
+
+    #[test]
     fn leak_detector_new() {
         unsafe {
             ffi::enable_logging();
@@ -145,8 +160,48 @@ mod tests {
 
     #[test]
     fn actualcown_constats_right() {
+        let mut size = 0;
+        let mut align = 0;
+
+        unsafe {
+            ffi::boxcar_actualcown_info(&mut size, &mut align);
+        }
+
         // TODO: Get these values over FFI.
-        assert_eq!(std::mem::size_of::<ActualCown>(), 32);
-        assert_eq!(std::mem::align_of::<ActualCown>(), 8);
+        assert_eq!(std::mem::size_of::<ActualCown>(), size);
+        assert_eq!(std::mem::align_of::<ActualCown>(), align);
+    }
+
+    #[test]
+    fn read_modify_write() {
+        scheduler::with_leak_detector(|| {
+            let mut c = CownPtr::new([0; 100]);
+            assert_ne!(c.ptr.lead_address(), ptr::null());
+            {
+                let c = unsafe { c.yolo_data() };
+                for (n, el) in c.iter_mut().enumerate() {
+                    assert_eq!(*el, 0);
+                    *el = n;
+                }
+            }
+
+            let mut c1 = c.clone();
+            assert_ne!(c1.ptr.lead_address(), ptr::null());
+
+            {
+                for (n, el) in unsafe { c1.yolo_data() }.iter_mut().enumerate() {
+                    assert_eq!(*el, n);
+                    *el *= 2;
+                }
+            }
+
+            let mut c2 = c.clone();
+            assert_ne!(c2.ptr.lead_address(), ptr::null());
+            {
+                for (n, el) in unsafe { c2.yolo_data() }.iter().enumerate() {
+                    assert_eq!(*el, n * 2);
+                }
+            }
+        })
     }
 }

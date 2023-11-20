@@ -31,23 +31,48 @@ impl<'a, T> ops::DerefMut for AquiredCown<'a, T> {
     }
 }
 
-extern "C" fn call_trampoline<'a, T>(aq: &mut ffi::AquiredCown, data: *mut ()) {
-    unsafe {
-        let func = mem::transmute::<_, UseFunc<T>>(data);
-        func(AquiredCown {
-            ptr: *aq,
-            marker: PhantomData,
-        });
+unsafe fn make_aq<'a, T>(aq: &mut ffi::AquiredCown) -> AquiredCown<'a, T> {
+    AquiredCown {
+        ptr: *aq,
+        marker: PhantomData,
     }
 }
 
-type UseFunc<T> = for<'a> fn(AquiredCown<'a, T>);
+extern "C" fn trampoline1<T>(aq: &mut ffi::AquiredCown, data: *mut ()) {
+    unsafe {
+        let func = mem::transmute::<_, UseFunc1<T>>(data);
+        func(make_aq(aq));
+    }
+}
+extern "C" fn trampoline2<T, U>(
+    a1: &mut ffi::AquiredCown,
+    a2: &mut ffi::AquiredCown,
+    data: *mut (),
+) {
+    unsafe {
+        let func: UseFunc2<T, U> = mem::transmute(data);
+        func(make_aq(a1), make_aq(a2));
+    }
+}
 
-pub fn when<T>(cown: &CownPtr<T>, f: UseFunc<T>) {
-    let trampoline = call_trampoline::<T>;
+type UseFunc1<T> = for<'a> fn(AquiredCown<'a, T>);
+type UseFunc2<T, U> = for<'a, 'b> fn(AquiredCown<'a, T>, AquiredCown<'b, U>);
+
+pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
+    let trampoline = trampoline1::<T>;
 
     unsafe {
         ffi::boxcar_when1(&cown.ptr, trampoline, f as _);
+    }
+}
+
+pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
+    // So we don't let the func aquire the same cown twice.
+    assert_ne!(c1.ptr.addr(), c2.ptr.addr());
+
+    let trampoline = trampoline2::<T, U>;
+    unsafe {
+        ffi::boxcar_when2(&c1.ptr, &c2.ptr, trampoline, f as _);
     }
 }
 
@@ -117,5 +142,30 @@ mod tests {
         });
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn when_two() {
+        scheduler::with(|| {
+            let string = CownPtr::new(String::new());
+            let vec = CownPtr::new(Vec::new());
+
+            when(&string, |mut s| {
+                assert_eq!(&*s, "");
+                s.push_str("foo");
+            });
+            when(&vec, |mut v| {
+                assert_eq!(&*v, &[]);
+                v.push(101);
+            });
+            when2(&string, &vec, |mut s, mut v| {
+                assert_eq!(&*s, "foo");
+                assert_eq!(&*v, &[101]);
+                s.push_str("bar");
+                v.push(666);
+            });
+            when(&string, |s| assert_eq!(&*s, "foobar"));
+            when(&vec, |v| assert_eq!(&*v, &[101, 666]));
+        })
     }
 }

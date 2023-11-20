@@ -84,6 +84,12 @@ extern "C" {
         func: extern "C" fn(&mut AquiredCown, *mut ()),
         data: *mut (),
     );
+    pub fn boxcar_when2(
+        c1: &CownPtr,
+        c2: &CownPtr,
+        func: extern "C" fn(&mut AquiredCown, &mut AquiredCown, *mut ()),
+        data: *mut (),
+    );
 
     pub fn enable_logging();
     pub fn dump_flight_recorder();

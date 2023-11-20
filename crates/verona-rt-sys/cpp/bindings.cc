@@ -123,6 +123,14 @@ extern "C"
   {
     when(*cown) << [=](aquired_cown acq) { func(&acq, data); };
   }
+  void boxcar_when2(
+    cown_ptr* c1,
+    cown_ptr* c2,
+    void (*func)(aquired_cown*, aquired_cown*, void*),
+    void* data)
+  {
+    when(*c1, *c2) << [=](auto a1, auto a2) { func(&a1, &a2, data); };
+  }
 
   int32_t boxcars_add(int32_t a, int32_t b)
   {

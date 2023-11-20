@@ -83,4 +83,39 @@ mod tests {
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 2);
     }
+
+    #[test]
+    fn on_vec() {
+        static RUN_COUNTER: AtomicU8 = AtomicU8::new(0);
+        fn incr() {
+            RUN_COUNTER.fetch_add(1, Ordering::SeqCst);
+        }
+
+        assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
+
+        scheduler::with(|| {
+            let vec_cown = CownPtr::new(vec![1, 2, 3]);
+
+            when(&vec_cown, |mut v| {
+                assert_eq!(*v, &[1, 2, 3]);
+                v.push(4);
+                incr();
+            });
+
+            when(&vec_cown, |mut v| {
+                assert_eq!(*v, &[1, 2, 3, 4]);
+                assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 1);
+                assert_eq!(v.pop(), Some(4));
+                incr();
+            });
+
+            when(&vec_cown, |v| {
+                assert_eq!(*v, &[1, 2, 3]);
+                assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 2);
+                incr();
+            });
+        });
+
+        assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 3);
+    }
 }

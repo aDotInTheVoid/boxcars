@@ -31,12 +31,15 @@ pub struct CownPtr<T> {
     _marker: PhantomData<T>,
 }
 
+const SAFETY_BYTES: usize = 16;
+
 #[repr(C)]
 /// It's never safe to dereference this type, or even to construct one.
 pub(crate) struct CownDataToxic<T> {
     // Must be first, so we can convert pointers between the two.
     cown: ActualCown,
     pub data: T,
+    safety: [u8; SAFETY_BYTES],
 }
 
 pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
@@ -46,6 +49,15 @@ pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
     let p = ptr as *mut CownDataToxic<T>;
 
     unsafe { ptr::addr_of_mut!((*p).data) }
+}
+
+fn cown_to_safety<T>(ptr: *mut ()) -> *mut [u8; SAFETY_BYTES] {
+    debug_assert!(!ptr.is_null());
+    debug_assert!((ptr as usize) & 15 == 0, "{ptr:p} not 16 bit aligned");
+
+    let p = ptr as *mut CownDataToxic<T>;
+
+    unsafe { ptr::addr_of_mut!((*p).safety) }
 }
 
 impl<T> CownPtr<T> {
@@ -101,23 +113,31 @@ extern "C" fn drop_glue<T>(cown: *mut ()) {
 impl<T> CownPtr<T> {
     /// Must be inside a runtime.
     // TODO: Enforce that.
+    const ALLOCATION_SIZE: usize = std::mem::size_of::<CownDataToxic<T>>();
+
     pub fn new(value: T) -> Self {
         unsafe {
             // The C++ code called here will read from the old value of cown to attempt to free it.
             // Luckely for us, `nullptr` is a valid value for a cown_ptr, and we can create one easily.
             let mut cown_ptr = mem::zeroed();
 
-            let theretical_size = std::mem::size_of::<CownDataToxic<T>>();
-            // TODO: Figure out why this helps.
-            let memory_size = theretical_size + 9;
+            // dbg!(Self::THERETICAL_SIZE, Self::ACTUAL_SIZE);
 
-            ffi::boxcar_cownptr_new(memory_size, drop_glue::<T>, &mut cown_ptr);
+            ffi::boxcar_cownptr_new(Self::ALLOCATION_SIZE, drop_glue::<T>, &mut cown_ptr);
 
             let this = Self {
                 cown_ptr,
                 _marker: PhantomData,
             };
             ptr::write(this.data_ptr(), value);
+
+            // dbg!(ptr::read(cown_to_safety::<T>(this.cown_ptr.addr())));
+
+            // ptr::write(
+            //     cown_to_safety::<T>(this.cown_ptr.addr()),
+            //     [0xCC; SAFETY_BYTES],
+            // );
+
             this
         }
     }

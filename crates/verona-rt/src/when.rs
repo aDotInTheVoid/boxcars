@@ -68,7 +68,8 @@ pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
 
 pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
     // So we don't let the func aquire the same cown twice.
-    assert_ne!(c1.ptr.addr(), c2.ptr.addr());
+    // See also: https://github.com/microsoft/verona-rt/pull/30
+    assert_ne!(c1.ptr.addr(), c2.ptr.addr(), "used the same cown twice");
 
     let trampoline = trampoline2::<T, U>;
     unsafe {
@@ -166,6 +167,16 @@ mod tests {
             });
             when(&string, |s| assert_eq!(&*s, "foobar"));
             when(&vec, |v| assert_eq!(&*v, &[101, 666]));
+        })
+    }
+
+    #[test]
+    #[should_panic = ""]
+    fn double_aquire() {
+        scheduler::with(|| {
+            let c1 = CownPtr::new(10);
+            let c2 = c1.clone();
+            when2(&c1, &c2, |_, _| loop {});
         })
     }
 }

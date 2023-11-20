@@ -68,8 +68,12 @@ impl<T> Clone for crate::cown::CownPtr<T> {
     }
 }
 
-extern "C" fn dummy_drop(ptr: *mut ()) {
-    dbg!(ptr);
+extern "C" fn drop_glue<T>(cown: *mut ()) {
+    let cown = cown as *mut CownData<T>;
+
+    unsafe {
+        ptr::drop_in_place(ptr::addr_of_mut!((*cown).data));
+    }
 }
 
 impl<T> CownPtr<T> {
@@ -84,7 +88,7 @@ impl<T> CownPtr<T> {
             ffi::boxcar_cownptr_new(
                 // TODO: Why is this needed? AAAH. +8 doesn't work.
                 std::mem::size_of::<CownData<T>>() + 9,
-                dummy_drop,
+                drop_glue::<T>,
                 &mut cown_ptr,
             );
 
@@ -104,6 +108,8 @@ impl<T> CownPtr<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     use super::*;
 
     use crate::scheduler::{self, with, with_leak_detector};
@@ -202,6 +208,42 @@ mod tests {
                     assert_eq!(*el, n * 2);
                 }
             }
+        })
+    }
+
+    struct WriteOnDrop<'a>(&'a Cell<bool>);
+    impl Drop for WriteOnDrop<'_> {
+        fn drop(&mut self) {
+            assert_eq!(self.0.get(), false);
+            self.0.set(true);
+        }
+    }
+
+    #[test]
+    fn dtor() {
+        scheduler::with(|| {
+            let flag = Cell::new(false);
+            let cown = CownPtr::new(WriteOnDrop(&flag));
+
+            assert_eq!(flag.get(), false);
+            drop(cown);
+            assert_eq!(flag.get(), true);
+        })
+    }
+
+    #[test]
+    fn dtor_clone() {
+        scheduler::with(|| {
+            let flag = Cell::new(false);
+            let cown = CownPtr::new(WriteOnDrop(&flag));
+
+            assert_eq!(flag.get(), false);
+            let cown2 = cown.clone();
+            assert_eq!(flag.get(), false);
+            drop(cown);
+            assert_eq!(flag.get(), false);
+            drop(cown2);
+            assert_eq!(flag.get(), true);
         })
     }
 }

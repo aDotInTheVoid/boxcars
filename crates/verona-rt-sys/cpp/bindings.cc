@@ -7,25 +7,32 @@
 #include <cpp/when.h>
 #include <sched/schedulerthread.h>
 
-using verona::cpp::acquired_cown;
-using verona::cpp::cown_ptr;
 using verona::cpp::make_cown;
 using verona::cpp::when;
 using verona::rt::Scheduler;
 using verona::rt::VCown;
 
-// struct Account : public VCown<Account>
-// {
-//   // Need explicit ctor for make_cown template magic.
-//   Account(int balance, bool frozen) : balance_(balance), frozen_(frozen) {}
+using verona::cpp::DtorThunk;
 
-//   int balance_;
-//   bool frozen_;
-// };
+using cown_ptr = verona::cpp::cown_ptr<DtorThunk>;
+using aquired_cown = verona::cpp::acquired_cown<DtorThunk>;
+using ActualCown = verona::cpp::ActualCown<DtorThunk>;
 
-typedef void(use_int(acquired_cown<int32_t>& cown, void* data));
-// typedef void(use_accout2(acquired_cown<Account>&, acquired_cown<Account>&));
+// Sane Rust platform assumptions.
+static_assert(sizeof(void*) == sizeof(size_t));
+static_assert(sizeof(void*) == sizeof(ptrdiff_t));
 
+// Ensure we're right about the definition of cown_ptr/aquired_cown.
+static_assert(sizeof(cown_ptr) == sizeof(void*));
+static_assert(sizeof(aquired_cown) == sizeof(void*));
+
+static constexpr size_t actual_sz = sizeof(ActualCown);
+static_assert(alignof(ActualCown) == alignof(void*));
+
+// It's critical that you don't pass a cown_ptr or an actual_cown directly as an
+// argument, or use them in a return type, as that'll lead to the wrong ABI.
+//
+// Instead, use pointer and out-params.
 extern "C"
 {
   /*
@@ -33,17 +40,17 @@ extern "C"
    */
 
   /// Returns a static global, so always safe AFAIKT.
-  Scheduler& scheduler_get(void)
+  Scheduler* scheduler_get(void)
   {
-    return Scheduler::get();
+    return &Scheduler::get();
   }
   void scheduler_init(Scheduler& sched, size_t count)
   {
     sched.init(count);
   }
-  void scheduler_run(Scheduler& sched)
+  void scheduler_run(Scheduler* sched)
   {
-    sched.run();
+    sched->run();
   }
 
   void schedular_set_detect_leaks(bool detect_leaks)
@@ -72,8 +79,6 @@ extern "C"
   {
     Logging::cout() << std::endl;
   }
-  // Need to ensure rust's `usize` is right.
-  static_assert(sizeof(size_t) == sizeof(ptrdiff_t));
   void boxcar_log_usize(size_t v)
   {
     Logging::cout() << v;
@@ -90,34 +95,47 @@ extern "C"
   /*
    * Cown
    */
-
-  void cown_int_new(int32_t value, cown_ptr<int32_t>* out)
+  void boxcar_cownptr_clone(cown_ptr* in, cown_ptr* out)
   {
-    static_assert(sizeof(cown_ptr<int32_t>) == sizeof(void*));
-    *out = make_cown<int32_t>(value);
+    *out = *in;
+  }
+  void boxcar_cownptr_drop(cown_ptr* ptr)
+  {
+    ptr->~cown_ptr();
+  }
+  void boxcar_cownptr_new(size_t size, void (*dtor)(void*), cown_ptr* out)
+  {
+    *out = verona::cpp::make_boxcar_cown(size, dtor);
+  }
+  void boxcar_aquiredcown_cown(aquired_cown* ptr, cown_ptr* out)
+  {
+    *out = ptr->cown();
   }
 
-  void cown_int_delete(cown_ptr<int32_t>* value)
+  void boxcar_size_info(
+    size_t* sizeof_actualcown,
+    size_t* alignof_actualcown,
+    size_t* sizeof_object_header,
+    size_t* object_alignment)
   {
-    value->~cown_ptr();
+    *sizeof_actualcown = sizeof(ActualCown);
+    *alignof_actualcown = alignof(ActualCown);
+    *sizeof_object_header = sizeof(verona::rt::Object::Header);
+    *object_alignment = verona::rt::Object::ALIGNMENT;
   }
 
-  void cown_int_clone(const cown_ptr<int32_t>& in, cown_ptr<int32_t>& out)
+  void
+  boxcar_when1(cown_ptr* cown, void (*func)(aquired_cown*, void*), void* data)
   {
-    out = in;
+    when(*cown) << [=](aquired_cown acq) { func(&acq, data); };
   }
-
-  void cown_int_when1(const cown_ptr<int32_t>& cown, use_int func, void* data)
+  void boxcar_when2(
+    cown_ptr* c1,
+    cown_ptr* c2,
+    void (*func)(aquired_cown*, aquired_cown*, void*),
+    void* data)
   {
-    when(cown) << [=](auto cown) { func(cown, data); };
-  }
-  int32_t& cown_get_ref(acquired_cown<int32_t> const& cown)
-  {
-    return cown.get_ref();
-  }
-  void cown_get_cown(acquired_cown<int32_t> const& cown, cown_ptr<int32_t>& out)
-  {
-    out = cown.cown();
+    when(*c1, *c2) << [=](auto a1, auto a2) { func(&a1, &a2, data); };
   }
 
   int32_t boxcars_add(int32_t a, int32_t b)

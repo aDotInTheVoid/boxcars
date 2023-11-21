@@ -8,7 +8,7 @@
 /// structs can exist, which will all point to the same singleton.
 ///
 /// Create with [`scheduler_get`]
-pub struct Scheduler(*const ());
+pub struct Scheduler(*mut ());
 
 #[repr(C)]
 /// This is a reference cointed pointer, so embeders shouldn't
@@ -77,7 +77,12 @@ extern "C" {
     pub fn boxcar_cownptr_new(size: usize, dtor: Dtor, output: &mut CownPtr);
     pub fn boxcar_aquiredcown_cown(input: &AquiredCown, out: &mut CownPtr);
 
-    pub fn boxcar_actualcown_info(size: &mut usize, align: &mut usize);
+    pub fn boxcar_size_info(
+        sizeof_actualcown: &mut usize,
+        alignof_actualcown: &mut usize,
+        sizeof_object_header: &mut usize,
+        object_alignment: &mut usize,
+    );
 
     pub fn boxcar_when1(
         cown: &CownPtr,

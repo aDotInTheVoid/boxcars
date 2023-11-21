@@ -31,15 +31,12 @@ pub struct CownPtr<T> {
     _marker: PhantomData<T>,
 }
 
-const SAFETY_BYTES: usize = 16;
-
 #[repr(C)]
 /// It's never safe to dereference this type, or even to construct one.
 pub(crate) struct CownDataToxic<T> {
     // Must be first, so we can convert pointers between the two.
     cown: ActualCown,
     pub data: T,
-    safety: [u8; SAFETY_BYTES],
 }
 
 pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
@@ -49,15 +46,6 @@ pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
     let p = ptr as *mut CownDataToxic<T>;
 
     unsafe { ptr::addr_of_mut!((*p).data) }
-}
-
-fn cown_to_safety<T>(ptr: *mut ()) -> *mut [u8; SAFETY_BYTES] {
-    debug_assert!(!ptr.is_null());
-    debug_assert!((ptr as usize) & 15 == 0, "{ptr:p} not 16 bit aligned");
-
-    let p = ptr as *mut CownDataToxic<T>;
-
-    unsafe { ptr::addr_of_mut!((*p).safety) }
 }
 
 impl<T> CownPtr<T> {
@@ -110,18 +98,30 @@ extern "C" fn drop_glue<T>(cown: *mut ()) {
     }
 }
 
+const SIZEOF_OBJECT_HEADER: usize = 16;
+const OBJECT_ALIGNMENT: usize = 16;
+const fn vsizeof<T>() -> usize {
+    use std::mem::size_of;
+    // The runtime stores an object header at the end of the object, so allocate
+    // some more space for it.
+    align_up(size_of::<T>() + SIZEOF_OBJECT_HEADER, OBJECT_ALIGNMENT)
+}
+const fn align_up(value: usize, alignment: usize) -> usize {
+    assert!(alignment.is_power_of_two());
+    let align_1 = alignment - 1;
+    return (value + align_1) & !align_1;
+}
+
 impl<T> CownPtr<T> {
+    const ALLOCATION_SIZE: usize = vsizeof::<CownDataToxic<T>>();
+
     /// Must be inside a runtime.
     // TODO: Enforce that.
-    const ALLOCATION_SIZE: usize = std::mem::size_of::<CownDataToxic<T>>();
-
     pub fn new(value: T) -> Self {
         unsafe {
             // The C++ code called here will read from the old value of cown to attempt to free it.
             // Luckely for us, `nullptr` is a valid value for a cown_ptr, and we can create one easily.
             let mut cown_ptr = mem::zeroed();
-
-            // dbg!(Self::THERETICAL_SIZE, Self::ACTUAL_SIZE);
 
             ffi::boxcar_cownptr_new(Self::ALLOCATION_SIZE, drop_glue::<T>, &mut cown_ptr);
 
@@ -203,16 +203,26 @@ mod tests {
 
     #[test]
     fn actualcown_constats_right() {
-        let mut size = 0;
-        let mut align = 0;
+        let mut sizeof_actualcown = 0;
+        let mut alignof_actualcown = 0;
+        let mut sizeof_object_header = 0;
+        let mut object_alignment = 0;
 
         unsafe {
-            ffi::boxcar_actualcown_info(&mut size, &mut align);
+            ffi::boxcar_size_info(
+                &mut sizeof_actualcown,
+                &mut alignof_actualcown,
+                &mut sizeof_object_header,
+                &mut object_alignment,
+            );
         }
 
         // TODO: Get these values over FFI.
-        assert_eq!(std::mem::size_of::<ActualCown>(), size);
-        assert_eq!(std::mem::align_of::<ActualCown>(), align);
+        assert_eq!(std::mem::size_of::<ActualCown>(), sizeof_actualcown);
+        assert_eq!(std::mem::align_of::<ActualCown>(), alignof_actualcown);
+
+        assert_eq!(sizeof_object_header, SIZEOF_OBJECT_HEADER);
+        assert_eq!(object_alignment, OBJECT_ALIGNMENT)
     }
 
     #[test]

@@ -109,10 +109,16 @@ extern "C"
     *out = ptr->cown();
   }
 
-  void boxcar_actualcown_info(size_t* size, size_t* allign)
+  void boxcar_size_info(
+    size_t* sizeof_actualcown,
+    size_t* alignof_actualcown,
+    size_t* sizeof_object_header,
+    size_t* object_alignment)
   {
-    *size = sizeof(ActualCown);
-    *allign = alignof(ActualCown);
+    *sizeof_actualcown = sizeof(ActualCown);
+    *alignof_actualcown = alignof(ActualCown);
+    *sizeof_object_header = sizeof(verona::rt::Object::Header);
+    *object_alignment = verona::rt::Object::ALIGNMENT;
   }
 
   void

@@ -40,17 +40,17 @@ extern "C"
    */
 
   /// Returns a static global, so always safe AFAIKT.
-  Scheduler& scheduler_get(void)
+  Scheduler* scheduler_get(void)
   {
-    return Scheduler::get();
+    return &Scheduler::get();
   }
   void scheduler_init(Scheduler& sched, size_t count)
   {
     sched.init(count);
   }
-  void scheduler_run(Scheduler& sched)
+  void scheduler_run(Scheduler* sched)
   {
-    sched.run();
+    sched->run();
   }
 
   void schedular_set_detect_leaks(bool detect_leaks)

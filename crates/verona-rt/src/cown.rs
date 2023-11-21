@@ -8,22 +8,7 @@ use std::{
 
 use verona_rt_sys as ffi;
 
-/// Wrapper over `verona::cpp::Cown` and friends
-///
-/// ## Implementation Notes
-///
-/// In C++, all these classes have move and copy constructors, so care must be taken.
-///
-/// You can't return them by value over an FFI boundry, as the ABI will be wrong, and you'll
-/// end up
-
-// +-------+-----------+----------------------+
-// | Cown  | DtorThunk | Rust Manged Whatever |
-// +-------+-----------+----------------------+
-// | ActualCown        |
-// +-------------------+----------------------+
-// | CownData                                 |
-// +------------------------------------------+
+// See docs/layout.md for how this works.
 
 pub struct CownPtr<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
@@ -36,7 +21,7 @@ pub struct CownPtr<T> {
 pub(crate) struct CownDataToxic<T> {
     // Must be first, so we can convert pointers between the two.
     cown: ActualCown,
-    pub data: T,
+    data: T,
 }
 
 pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
@@ -53,9 +38,8 @@ impl<T> CownPtr<T> {
         cown_to_data(self.cown_ptr.addr())
     }
 
-    /// Safety: lol
-    // #[cfg(test)]
-    pub unsafe fn yolo_data(&mut self) -> &mut T {
+    #[cfg(test)]
+    unsafe fn yolo_data(&mut self) -> &mut T {
         &mut *(self.data_ptr() as *mut T)
     }
 }
@@ -102,8 +86,7 @@ const SIZEOF_OBJECT_HEADER: usize = 16;
 const OBJECT_ALIGNMENT: usize = 16;
 const fn vsizeof<T>() -> usize {
     use std::mem::size_of;
-    // The runtime stores an object header at the end of the object, so allocate
-    // some more space for it.
+    // The runtime stores an object header below the returned pointer, but we still need space for it in the allocation.
     align_up(size_of::<T>() + SIZEOF_OBJECT_HEADER, OBJECT_ALIGNMENT)
 }
 const fn align_up(value: usize, alignment: usize) -> usize {
@@ -217,7 +200,6 @@ mod tests {
             );
         }
 
-        // TODO: Get these values over FFI.
         assert_eq!(std::mem::size_of::<ActualCown>(), sizeof_actualcown);
         assert_eq!(std::mem::align_of::<ActualCown>(), alignof_actualcown);
 
@@ -256,6 +238,56 @@ mod tests {
                 }
             }
         })
+    }
+
+    #[test]
+    fn write_stress() {
+        fn stress_once<const N: usize>() {
+            let mut x = CownPtr::new([0u8; N]);
+
+            unsafe {
+                for i in x.yolo_data() {
+                    assert_eq!(*i, 0);
+                    *i = 0xCC;
+                }
+            }
+
+            let mut x2 = x.clone();
+            unsafe {
+                for i in x2.yolo_data() {
+                    assert_eq!(*i, 0xCC);
+                    *i = 0x33;
+                }
+            }
+            drop(x2);
+
+            unsafe {
+                for i in x.yolo_data() {
+                    assert_eq!(*i, 0x33);
+                }
+            }
+
+            drop(x);
+        }
+
+        fn repeat_alloc<const N: usize>() {
+            for _ in 0..100 {
+                stress_once::<N>();
+            }
+        }
+
+        scheduler::with_leak_detector(|| {
+            repeat_alloc::<3932>();
+            repeat_alloc::<3719>();
+            repeat_alloc::<1477>();
+            repeat_alloc::<414>();
+            repeat_alloc::<163>();
+            repeat_alloc::<4>();
+            repeat_alloc::<3>();
+            repeat_alloc::<2>();
+            repeat_alloc::<1>();
+            repeat_alloc::<0>();
+        });
     }
 
     struct WriteOnDrop<'a>(&'a Cell<bool>);

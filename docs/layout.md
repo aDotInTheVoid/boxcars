@@ -126,9 +126,18 @@ know it's embeded).
 
 We need to hook into the verona runtime so we can create an `ActualCown` but
 with enough space for the `CownDataToxic<T>`. When we do this, we also need to
-add 16 bytes at the end of the allocation for the object header (which appears
-to be stored at the end of the allocation). See the [this][operator_new] and
-[this][vsizeof] for where verona does the allocations.
+add 16 bytes for the object header). See the [this][operator_new] and
+[this][vsizeof] for where verona does the sizing and [this][object_start].
 
 [operator_new]: https://github.com/microsoft/verona-rt/blob/0919daa4a6053773d3b74bb3c82702c202175630/src/rt/cpp/vobject.h#L181-L185
 [vsizeof]: https://github.com/microsoft/verona-rt/blob/0919daa4a6053773d3b74bb3c82702c202175630/src/rt/object/object.h#L868C1-L870
+[object_start]: https://github.com/microsoft/verona-rt/blob/0919daa4a6053773d3b74bb3c82702c202175630/src/rt/object/object.h#L273-L276
+
+All in all, that means if we have a `cown_ptr<usize>`, the underlying memory looks like:
+
+- Object Header
+- CownDataToxic<usize>   (<- cown_ptr is here, not object header)
+  - ActualCown<DtorThunk>
+    - Cown
+    - dtor
+  - data (usize)

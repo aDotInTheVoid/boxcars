@@ -29,6 +29,10 @@ static_assert(sizeof(aquired_cown) == sizeof(void*));
 static constexpr size_t actual_sz = sizeof(ActualCown);
 static_assert(alignof(ActualCown) == alignof(void*));
 
+// It's critical that you don't pass a cown_ptr or an actual_cown directly as an
+// argument, or use them in a return type, as that'll lead to the wrong ABI.
+//
+// Instead, use pointer and out-params.
 extern "C"
 {
   /*
@@ -97,7 +101,6 @@ extern "C"
   }
   void boxcar_cownptr_drop(cown_ptr* ptr)
   {
-    // TODO: Run custom dtor.
     ptr->~cown_ptr();
   }
   void boxcar_cownptr_new(size_t size, void (*dtor)(void*), cown_ptr* out)

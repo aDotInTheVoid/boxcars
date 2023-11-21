@@ -114,13 +114,6 @@ impl<T> CownPtr<T> {
             };
             ptr::write(this.data_ptr(), value);
 
-            // dbg!(ptr::read(cown_to_safety::<T>(this.cown_ptr.addr())));
-
-            // ptr::write(
-            //     cown_to_safety::<T>(this.cown_ptr.addr()),
-            //     [0xCC; SAFETY_BYTES],
-            // );
-
             this
         }
     }

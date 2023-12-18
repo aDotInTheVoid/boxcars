@@ -176,6 +176,7 @@ mod tests {
 
     #[test]
     #[should_panic = ""]
+    #[ignore = "Panics with schedular lock don't work, see #16"]
     fn double_aquire() {
         scheduler::with(|| {
             let c1 = CownPtr::new(10);

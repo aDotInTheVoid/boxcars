@@ -20,6 +20,7 @@ Rust's most important feature (for our purposes) is its system of **Ownership & 
 
 #### Ownership & Borrowing: A very fast introduction.
 
+(A full tutorial on ownership and borrowing is beyond the scope of this report. See [@rust_book] for details.)
 The core idea of **ownership** is that each value has a unique owner, and that value is dropped when the
 owner goes out of scope. To quote The Book [@rust_book]:
 
@@ -32,6 +33,9 @@ uneconomic. If a function took a string as a parameter, it would have "take
 ownership" of that value, so the calling function could no longer use it.
 [^return_values]
 
+[^return_values]: This could be circumvented by having a function return back it's args to the caller, but this would
+be extremely cumbersome.
+
 Therefore, Rust introduces the additional notion of **borrowing**. A value can be borrowed in
 one of two ways: by a shared reference (spelt `&T`), or an exclusive reference (`&mut T`). These are
 also sometimes referred to as a immutable or mutable reference respectively [@dtolnay_ref].
@@ -40,6 +44,61 @@ A value may have many shared references to it at a given time, but if it has any
 exclusive reference to it that reference must be the only one. With a shared
 reference, you can only read from the value. An exclusive reference is required
 to mutate it. More succinctly, Rust references are "Aliasable XOR mutable" [@boats_smaller].
+
+Borrowed values have a **lifetime** for which they are borrowed. This is needed to ensure
+that all exclusive references don't overlap with shared ones.
+
+```rust
+let x: i32 = 0;
+
+let shared_1: &i32 = &x; // Lifetime 1 starts
+dbg!(shared_1);
+// Lifetime 1 stops.
+
+let exclusive_2: &mut i32 = &mut x; // Lifetime 2 starts
+// Would be compiler error to borrow x here.
+*exclusive_2 += 10;
+// Lifetime 2 ends
+
+// But now that lifetime 2 is over, we can borrow again
+
+let shared_3: &i32 = &x; // Lifetime 3 starts
+let shared_4: &i32 = &x; // Lifetime 4 starts
+
+dbg!(shared_4);
+// Lifetime 4 ends
+dbg!(shared_3);
+// Lifetime 3 ends
+```
+
+This is also used to ensure that references don't outlive the objects they borrow.
+
+```rust
+let mut x: &i32 = 0;
+{
+    let short_lived: i32 = 0;
+    x = &short_lived;
+} // short_lived goes out of scope here.
+dbg!(x);
+```
+
+will error with
+
+```
+error[E0597]: `short_lived` does not live long enough
+ --> src/main.rs:5:13
+  |
+4 |         let short_lived: i32 = 0;
+  |             ----------- binding `short_lived` declared here
+5 |         x = &short_lived;
+  |             ^^^^^^^^^^^^ borrowed value does not live long enough
+6 |     }
+  |     - `short_lived` dropped here while still borrowed
+7 |     dbg!(x);
+  |          - borrow later used here
+```
+
+instead of doing UB like it would in C++.
 
 #### Consequence of this: No iterator invalidation
 
@@ -196,22 +255,26 @@ Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm
 
 - **Cowns**: A cown (short for concurrent owner) is a piece of data.
 
-    A cown can be in one of two states: available or acquired. An availible
-    cown is eligable to be aquired by a behaviour, but it's associated data
-    cannot be accessed. An aquired cown
+    A cown can be in one of two states: available or acquired. An available
+    cown is eligible to be acquired by a behaviour, but it's associated data
+    cannot be accessed. An acquired cown can have it's data accessed, but only
+    while it's aquired.
 
-    The only way to aquire a cown (and thus access it's)
-
+    The only way to acquire a cown (and thus access it's) is to run a behaviour on it.
 
 - **Behaviours**: A behaviour is a unit of execution that acts upon a set of cowns.
 
     When you create a behaviour, you give the set of cowns it acts on, as well as
-    the code to run. When all the required cowns can be acquired, the code is executed.
+    the code to run. When all the required cowns can be acquired, the code is executed, and then
+    the cowns are made available again.
+
+    Cowns can only be acquired by one behaviour at once. This can be thaugh of as being a bit
+    like each Cown having a mutex, which is locked before the behaviour starts and unlocked after
+    it ends. However, every cown in a behaviour is acquired "at once"
 
     Note that this means that creating a behaviour returns immediately, and the code inside
     will be executed at some indetermined future point, when unique access to all cowns can
     be guaranteed.
-
 
 
 ```scala
@@ -224,6 +287,8 @@ when(myCown) {
 myCown += 10; // invalid.
 ```
 
+BoC is both *data-race free* and *deadlock free*. No data races can occur, as
+cowns can only be modified when acquired by behaviours,
 
 ### Verona Runtime
 

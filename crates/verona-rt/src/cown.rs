@@ -1,6 +1,5 @@
-use core::fmt;
-use std::{
-    fmt::Debug,
+use core::{
+    fmt,
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ptr,
@@ -56,7 +55,7 @@ impl<T> fmt::Pointer for CownPtr<T> {
     }
 }
 
-impl<T> std::ops::Drop for CownPtr<T> {
+impl<T> core::ops::Drop for CownPtr<T> {
     fn drop(&mut self) {
         unsafe { ffi::boxcar_cownptr_drop(&mut self.cown_ptr) };
     }

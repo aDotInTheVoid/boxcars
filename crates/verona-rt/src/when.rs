@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, mem, ops};
+use core::{marker::PhantomData, mem, ops};
 
 use verona_rt_sys as ffi;
 

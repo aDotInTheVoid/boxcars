@@ -78,5 +78,13 @@
         "ios": "cpp",
         "locale": "cpp"
     },
-    "cmake.sourceDirectory": "/home/alona/icnotes/60010-final-year-project/crates/verona-rt-sys/cpp"
+    "cmake.sourceDirectory": "/home/alona/icnotes/60010-final-year-project/crates/verona-rt-sys/cpp",
+    "cSpell.words": [
+        "Behaviour",
+        "Behaviours",
+        "cown",
+        "Cowns",
+        "indetermined",
+        "pandoc"
+    ]
 }

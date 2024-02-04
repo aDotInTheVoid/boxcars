@@ -3,8 +3,8 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/verona-rt/src/rt",
-                "${workspaceFolder}/build/_deps/snmalloc-src/src"
+                "${workspaceFolder}/crates/verona-rt-sys/verona-rt/src/rt",
+                "${workspaceFolder}/crates/verona-rt-sys/cpp/build/_deps/snmalloc-src/src/"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

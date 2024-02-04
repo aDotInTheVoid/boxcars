@@ -15,16 +15,16 @@ using verona::rt::VCown;
 using verona::cpp::DtorThunk;
 
 using cown_ptr = verona::cpp::cown_ptr<DtorThunk>;
-using aquired_cown = verona::cpp::acquired_cown<DtorThunk>;
+using acquired_cown = verona::cpp::acquired_cown<DtorThunk>;
 using ActualCown = verona::cpp::ActualCown<DtorThunk>;
 
 // Sane Rust platform assumptions.
 static_assert(sizeof(void*) == sizeof(size_t));
 static_assert(sizeof(void*) == sizeof(ptrdiff_t));
 
-// Ensure we're right about the definition of cown_ptr/aquired_cown.
+// Ensure we're right about the definition of cown_ptr/acquired_cown.
 static_assert(sizeof(cown_ptr) == sizeof(void*));
-static_assert(sizeof(aquired_cown) == sizeof(void*));
+static_assert(sizeof(acquired_cown) == sizeof(void*));
 
 static constexpr size_t actual_sz = sizeof(ActualCown);
 static_assert(alignof(ActualCown) == alignof(void*));
@@ -107,7 +107,7 @@ extern "C"
   {
     *out = verona::cpp::make_boxcar_cown(size, dtor);
   }
-  void boxcar_aquiredcown_cown(aquired_cown* ptr, cown_ptr* out)
+  void boxcar_acquiredcown_cown(acquired_cown* ptr, cown_ptr* out)
   {
     *out = ptr->cown();
   }
@@ -125,14 +125,14 @@ extern "C"
   }
 
   void
-  boxcar_when1(cown_ptr* cown, void (*func)(aquired_cown*, void*), void* data)
+  boxcar_when1(cown_ptr* cown, void (*func)(acquired_cown*, void*), void* data)
   {
-    when(*cown) << [=](aquired_cown acq) { func(&acq, data); };
+    when(*cown) << [=](acquired_cown acq) { func(&acq, data); };
   }
   void boxcar_when2(
     cown_ptr* c1,
     cown_ptr* c2,
-    void (*func)(aquired_cown*, aquired_cown*, void*),
+    void (*func)(acquired_cown*, acquired_cown*, void*),
     void* data)
   {
     when(*c1, *c2) << [=](auto a1, auto a2) { func(&a1, &a2, data); };

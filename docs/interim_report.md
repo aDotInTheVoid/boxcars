@@ -214,7 +214,7 @@ If any of these properties had changed, we'd get a compiler error.
 #### Ownership & Borrowing can't save you from everything
 
 However, one area where Rust's type system doesn't do anything to help you is avoiding deadlocks.
-One can trivially perform one by aquireing two mutex's in different orders:
+One can trivially perform one by acquiring two mutex's in different orders:
 
 ```Rust
 use std::sync::Mutex;

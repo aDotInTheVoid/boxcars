@@ -28,7 +28,7 @@ impl CownPtr {
         self.0
     }
 }
-impl AquiredCown {
+impl AcquiredCown {
     pub fn addr(&self) -> *mut () {
         self.0
     }
@@ -36,7 +36,7 @@ impl AquiredCown {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct AquiredCown(*mut ());
+pub struct AcquiredCown(*mut ());
 
 pub type Dtor = extern "C" fn(*mut ());
 
@@ -80,7 +80,7 @@ extern "C" {
     pub fn boxcar_cownptr_clone(input: &CownPtr, output: &mut CownPtr);
     pub fn boxcar_cownptr_drop(ptr: &mut CownPtr);
     pub fn boxcar_cownptr_new(size: usize, dtor: Dtor, output: &mut CownPtr);
-    pub fn boxcar_aquiredcown_cown(input: &AquiredCown, out: &mut CownPtr);
+    pub fn boxcar_acquiredcown_cown(input: &AcquiredCown, out: &mut CownPtr);
 
     pub fn boxcar_size_info(
         sizeof_actualcown: &mut usize,
@@ -91,13 +91,13 @@ extern "C" {
 
     pub fn boxcar_when1(
         cown: &CownPtr,
-        func: extern "C" fn(&mut AquiredCown, *mut ()),
+        func: extern "C" fn(&mut AcquiredCown, *mut ()),
         data: *mut (),
     );
     pub fn boxcar_when2(
         c1: &CownPtr,
         c2: &CownPtr,
-        func: extern "C" fn(&mut AquiredCown, &mut AquiredCown, *mut ()),
+        func: extern "C" fn(&mut AcquiredCown, &mut AcquiredCown, *mut ()),
         data: *mut (),
     );
 

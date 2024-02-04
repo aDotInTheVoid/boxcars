@@ -80,9 +80,11 @@
     },
     "cmake.sourceDirectory": "/home/alona/icnotes/60010-final-year-project/crates/verona-rt-sys/cpp",
     "cSpell.words": [
+        "acquiredcown",
         "Behaviour",
         "Behaviours",
         "cown",
+        "cownptr",
         "Cowns",
         "indetermined",
         "pandoc"

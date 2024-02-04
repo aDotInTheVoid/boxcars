@@ -5,20 +5,20 @@ use verona_rt_sys as ffi;
 
 use crate::cown::CownPtr;
 
-pub struct AquiredCown<'a, T> {
+pub struct AcquiredCown<'a, T> {
     // TODO: As an optimization, point to the `T`, and roll the pointer back to
     // find the cown, (instead of pointing to cown, and going forward to T).
-    ptr: ffi::AquiredCown,
+    ptr: ffi::AcquiredCown,
     marker: PhantomData<&'a mut T>,
 }
 
-impl<'a, T> AquiredCown<'a, T> {
+impl<'a, T> AcquiredCown<'a, T> {
     fn data_ptr(&self) -> *mut T {
         super::cown::cown_to_data(self.ptr.addr())
     }
 }
 
-impl<'a, T> ops::Deref for AquiredCown<'a, T> {
+impl<'a, T> ops::Deref for AcquiredCown<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -26,39 +26,39 @@ impl<'a, T> ops::Deref for AquiredCown<'a, T> {
     }
 }
 
-impl<'a, T> ops::DerefMut for AquiredCown<'a, T> {
+impl<'a, T> ops::DerefMut for AcquiredCown<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.data_ptr() }
     }
 }
 
-impl<'a, T: fmt::Debug> fmt::Debug for AquiredCown<'a, T> {
+impl<'a, T: fmt::Debug> fmt::Debug for AcquiredCown<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.deref(), f)
     }
 }
-impl<'a, T: fmt::Display> fmt::Display for AquiredCown<'a, T> {
+impl<'a, T: fmt::Display> fmt::Display for AcquiredCown<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self.deref(), f)
     }
 }
 
-unsafe fn make_aq<'a, T>(aq: &mut ffi::AquiredCown) -> AquiredCown<'a, T> {
-    AquiredCown {
+unsafe fn make_aq<'a, T>(aq: &mut ffi::AcquiredCown) -> AcquiredCown<'a, T> {
+    AcquiredCown {
         ptr: *aq,
         marker: PhantomData,
     }
 }
 
-extern "C" fn trampoline1<T>(aq: &mut ffi::AquiredCown, data: *mut ()) {
+extern "C" fn trampoline1<T>(aq: &mut ffi::AcquiredCown, data: *mut ()) {
     unsafe {
         let func = mem::transmute::<_, UseFunc1<T>>(data);
         func(make_aq(aq));
     }
 }
 extern "C" fn trampoline2<T, U>(
-    a1: &mut ffi::AquiredCown,
-    a2: &mut ffi::AquiredCown,
+    a1: &mut ffi::AcquiredCown,
+    a2: &mut ffi::AcquiredCown,
     data: *mut (),
 ) {
     unsafe {
@@ -67,8 +67,8 @@ extern "C" fn trampoline2<T, U>(
     }
 }
 
-type UseFunc1<T> = for<'a> fn(AquiredCown<'a, T>);
-type UseFunc2<T, U> = for<'a, 'b> fn(AquiredCown<'a, T>, AquiredCown<'b, U>);
+type UseFunc1<T> = for<'a> fn(AcquiredCown<'a, T>);
+type UseFunc2<T, U> = for<'a, 'b> fn(AcquiredCown<'a, T>, AcquiredCown<'b, U>);
 
 pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
     let trampoline = trampoline1::<T>;
@@ -79,7 +79,7 @@ pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
 }
 
 pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
-    // So we don't let the func aquire the same cown twice.
+    // So we don't let the func acquire the same cown twice.
     // See also: https://github.com/microsoft/verona-rt/pull/30
     assert_ne!(
         c1.cown_ptr.addr(),
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     #[should_panic = ""]
     #[ignore = "Panics with schedular lock don't work, see #16"]
-    fn double_aquire() {
+    fn double_acquire() {
         scheduler::with(|| {
             let c1 = CownPtr::new(10);
             let c2 = c1.clone();

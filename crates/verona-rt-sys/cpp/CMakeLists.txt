@@ -9,7 +9,7 @@ endif()
 # Don't build all the runtimes tests to install.
 # set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY true)
 
-set(VERONA_PATH "../../../verona-rt/")
+set(VERONA_PATH "../verona-rt/")
 
 
 add_subdirectory(${VERONA_PATH} verona-rt)

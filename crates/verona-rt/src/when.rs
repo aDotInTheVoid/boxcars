@@ -1,4 +1,5 @@
-use core::{marker::PhantomData, mem, ops};
+use core::{fmt, marker::PhantomData, mem, ops};
+use std::ops::Deref;
 
 use verona_rt_sys as ffi;
 
@@ -28,6 +29,17 @@ impl<'a, T> ops::Deref for AquiredCown<'a, T> {
 impl<'a, T> ops::DerefMut for AquiredCown<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.data_ptr() }
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for AquiredCown<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self.deref(), f)
+    }
+}
+impl<'a, T: fmt::Display> fmt::Display for AquiredCown<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self.deref(), f)
     }
 }
 
@@ -182,6 +194,18 @@ mod tests {
             let c1 = CownPtr::new(10);
             let c2 = c1.clone();
             when2(&c1, &c2, |_, _| loop {});
+        })
+    }
+
+    #[test]
+    fn fmt_acquired() {
+        scheduler::with(|| {
+            let x = CownPtr::new("101");
+            when(&x, |x| {
+                assert_eq!(*x, "101");
+                assert_eq!(format!("{x}"), "101");
+                assert_eq!(format!("{x:?}"), r#""101""#);
+            })
         })
     }
 }

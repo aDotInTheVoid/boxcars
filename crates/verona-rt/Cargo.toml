@@ -1,13 +1,13 @@
 [package]
 name = "verona-rt"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "Idiomatic binding to the verona runtime"
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-verona-rt-sys = { version = "=0.0.1", path = "../verona-rt-sys" }
+verona-rt-sys = { version = "=0.0.2", path = "../verona-rt-sys" }
 
 [features]
 systematic_testing = ["verona-rt-sys/systematic_testing"]

@@ -2,16 +2,19 @@ cmake_minimum_required(VERSION 3.22)
 
 project(verona-rt-sys-bindings)
 
+include(FetchContent)
+
 if(CMAKE_GENERATOR STREQUAL "Ninja")
     set(CMAKE_COLOR_DIAGNOSTICS ON)
 endif()
 
-# Don't build all the runtimes tests to install.
-# set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY true)
+# We override snmalloc to use our submodule, so that we don't
+# need to hit the network to build. This matters for docs.rs.
+# See #18 for details.
+set(SNMALLOC_PATH "../snmalloc/")
+FetchContent_Declare(snmalloc SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/${SNMALLOC_PATH}")
 
 set(VERONA_PATH "../verona-rt/")
-
-
 add_subdirectory(${VERONA_PATH} verona-rt)
 
 

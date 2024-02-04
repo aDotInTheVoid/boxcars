@@ -1,4 +1,9 @@
 //! Low level FFI bindings to the [verona runtime](https://github.com/microsoft/verona-rt)
+//!
+//! This is an implementation detail of the verona-rt crate.
+//!
+//! This is a research project, and is at an early stage of development. It is not
+//! ready for use outside of research.
 
 #[repr(C)]
 #[derive(Clone, Copy)]

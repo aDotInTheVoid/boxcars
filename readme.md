@@ -9,3 +9,14 @@ as introduced in that paper.
 
 This is a research project, and is at an early stage of development. It is not
 ready for use outside of research.
+
+## Developing
+
+Cargo will automatically invoke cmake. However, when working on the bindings,
+it's nicer to use it manually.
+
+```
+cd crates/verona-rt-sys/cpp
+cmake -B build -GNinja -D VERONA_RT_ONLY_HEADER_LIBRARY=ON
+ninja -C build
+```

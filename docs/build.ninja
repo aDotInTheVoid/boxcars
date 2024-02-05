@@ -1,7 +1,10 @@
 ninja_required_version = 1.3
 
 rule pandoc
-  command = pandoc $in -o $out --citeproc --standalone
+  command = pandoc $in -o $out --citeproc --standalone $flags
 
 build _out/interim_report.pdf:  pandoc interim_report.md
 build _out/interim_report.html: pandoc interim_report.md
+
+build _out/msr-pres.pdf: pandoc msr-pres.md
+  flags = -t beamer

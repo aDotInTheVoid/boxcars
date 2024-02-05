@@ -1,5 +1,5 @@
-use verona_rt::cown::CownPtr;
-use verona_rt::scheduler::with_leak_detector;
+use verona_rt::with_leak_detector;
+use verona_rt::CownPtr;
 
 use std::mem;
 

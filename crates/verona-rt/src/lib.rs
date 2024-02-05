@@ -1,11 +1,6 @@
 //! ```rust
-//! # use verona_rt::{
-//! #     cown::CownPtr,
-//! #     scheduler::with,
-//! #     when::{when, when2},
-//! # };
-//! #
-//! # with(|| {
+//! # use verona_rt::*;
+//! # with_scheduler(|| {
 //! let string = CownPtr::new(String::new());
 //! let vec = CownPtr::new(Vec::new());
 //!
@@ -61,5 +56,6 @@ mod scheduler;
 mod when;
 
 pub use cown::CownPtr;
-pub use scheduler::with as with_scheduler;
+pub use log::log;
+pub use scheduler::{with as with_scheduler, with_leak_detector};
 pub use when::{when, when2, AcquiredCown};

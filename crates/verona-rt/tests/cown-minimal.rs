@@ -1,8 +1,8 @@
-use verona_rt::cown::CownPtr;
+use verona_rt::CownPtr;
 
 #[test]
 fn main() {
-    verona_rt::scheduler::with_leak_detector(|| {
+    verona_rt::with_scheduler(|| {
         let v1 = CownPtr::new(101);
         drop(v1);
     });

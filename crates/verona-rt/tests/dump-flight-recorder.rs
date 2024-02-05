@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use verona_rt::{log::log, scheduler};
+use verona_rt::{log, with_scheduler};
 
 // cargo test --test dump-flight-recorder --features flight_recorder
 
@@ -10,7 +10,7 @@ fn main() {
         verona_rt_sys::enable_logging();
     }
 
-    scheduler::with(|| {
+    with_scheduler(|| {
         log(cstr::cstr!("Hello World\n"));
 
         // TODO: Less rigamarole

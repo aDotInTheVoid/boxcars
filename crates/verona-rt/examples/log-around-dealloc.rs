@@ -1,7 +1,7 @@
 use cstr::cstr;
 use verona_rt_sys as ffi;
 
-use verona_rt::{cown::CownPtr, log::log, scheduler};
+use verona_rt::{log, with_scheduler, CownPtr};
 
 fn main() {
     unsafe {
@@ -9,7 +9,7 @@ fn main() {
         ffi::enable_logging();
     }
 
-    scheduler::with(|| {
+    with_scheduler(|| {
         log(cstr!("TOP"));
         let v1 = CownPtr::new(10);
         log(cstr!("Just alloced"));

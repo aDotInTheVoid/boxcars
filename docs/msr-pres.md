@@ -10,6 +10,17 @@ aspectratio: 169
 - BoC concurrency in Rust.
 - With the existing verona-rt implementation.
 
+## Current Status
+
+- Cowns work
+- `when` works
+    - Only 1 & 2 Cowns
+- On crates.io today
+- Lots to do:
+    - Atomically scheduling multiple behaviours
+    - Schedule across any number of cowns.
+    - Tests & Benchmarks
+
 ##
 
 ```rust

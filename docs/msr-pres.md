@@ -103,12 +103,25 @@ when(&string,           |s|   assert_eq!(&*s,   "foobar"));
 when(&vec,           |v|   assert_eq!(&*v,             &[101, 666]));
 ```
 
-##
+## Design Decisions
 
-<!-- https://excalidraw.com/#json=-ZO3ZfUoO2w5aw8UONjJy,87x_zyNBCiW0Vqmnbm08Jg -->
-![](./img/layout-1.png)
+- Reuse C++ `verona-rt`
+    - Write bindings, don't port
+- Do all allocations and reference counting in C++
 
 ##
+![](./img/layout-hist/layout-hist-1(2).png)
+
+##
+![](./img/layout-hist/layout-hist-2.png)
+
+##
+![](./img/layout-hist/layout-hist-3.png)
+
+##
+![](./img/layout-hist/layout-hist-4(2).png)
+
+## Rust Side Representation
 
 ```rust
 #[repr(C)]
@@ -120,57 +133,80 @@ struct CownDataToxic<T> {
     cown: ActualCown, // Must be first, so we can cast pointers
     data: T,
 }
+
+struct CownPtr<T> {
+    cown_ptr: *mut (),
+    _marker: PhantomData<T>,
+}
 ```
 
 
-##
+## New C++ API
 
 ```cpp
-typedef void (*dtor)(void*);
-class DtorThunk
-{
+typedef void (*dtor)(void *);
+
+class DtorThunk {
   dtor dtor_;
   DtorThunk(dtor dtor) : dtor_(dtor) {}
   ~DtorThunk();
 };
 
-cown_ptr<DtorThunk> make_boxcar_cown(size_t size, dtor dtor)
-{
-  ActualCown<DtorThunk>* ptr = new (size) ActualCown<DtorThunk>(dtor);
+cown_ptr<DtorThunk> make_boxcar_cown(size_t size, dtor dtor) {
+  ActualCown<DtorThunk> *ptr = new (size) ActualCown<DtorThunk>(dtor);
   return cown_ptr<DtorThunk>(ptr);
 }
 ```
 
-##
+## New Allocation Methods
 
 ```cpp
-template<class T>
-class VCown : public VBase<T, Cown>
-{
+template <class T> class VCown : public VBase<T, Cown> {
   // Original
-  void* operator new(size_t)
-  {
-    return Object::register_object(
-      ThreadAlloc::get().alloc<vsizeof<T>>(), VBase<T, Cown>::desc());
+  void *operator new(size_t) {
+    return Object::register_object(ThreadAlloc::get().alloc<vsizeof<T>>(),
+                                   VBase<T, Cown>::desc());
   }
 
   // My new thing
-  void* operator new(size_t base_size, size_t req_size)
-  {
+  void *operator new(size_t base_size, size_t req_size) {
     assert(req_size >= base_size);
-    return Object::register_object(
-      ThreadAlloc::get().alloc(req_size), VBase<T, Cown>::desc());
+    return Object::register_object(ThreadAlloc::get().alloc(req_size),
+                                   VBase<T, Cown>::desc());
   }
 };
 ```
 
-## Thing's I'd love to know:
+## Rust Side Construction
 
-- What do you want out of this project?
-- What of this can go upstream, and how?
-- How will the Verona compiler interact with the runtime (embed clang??).
+```rust
+
+impl<T> CownPtr<T> {
+  const ALLOCATION_SIZE: usize = vsizeof::<CownDataToxic<T>>();
+
+  pub fn new(value: T) -> Self {
+     unsafe {
+        let mut cown_ptr = mem::zeroed();
+        ffi::boxcar_cownptr_new(
+            Self::ALLOCATION_SIZE,
+            drop_glue::<T>,
+            &mut cown_ptr
+        );
+        let this = Self { cown_ptr, _marker: PhantomData};
+        ptr::write(this.data_ptr(), value);
+        this
+     }
+  }
+}
+```
 
 ## Questions?
+
+- Does this make sense?
+- How much of this is generalizable?
+- How to go about upstreaming?
+
+## Links
 
 - Source: [github.com/aDotInTheVoid/boxcars](https://github.com/aDotInTheVoid/boxcars)
 - Email: [alona.enraght-moony21@imperial.ac.uk](mailto:alona.enraght-moony21@imperial.ac.uk)

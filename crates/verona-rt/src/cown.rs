@@ -94,7 +94,7 @@ const SIZEOF_OBJECT_HEADER: usize = {
     }
     std::mem::size_of::<ObjectHeader>()
 };
-const fn vsizeof<T>() -> usize {
+pub(crate) const fn vsizeof<T>() -> usize {
     use std::mem::size_of;
     // The runtime stores an object header below the returned pointer, but we still need space for it in the allocation.
     align_up(size_of::<T>() + SIZEOF_OBJECT_HEADER, OBJECT_ALIGNMENT)

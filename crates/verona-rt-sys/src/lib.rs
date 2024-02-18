@@ -5,6 +5,8 @@
 //! This is a research project, and is at an early stage of development. It is not
 //! ready for use outside of research.
 
+pub mod descriptor;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 /// A reference to a `verona::rt::Scheduler`.

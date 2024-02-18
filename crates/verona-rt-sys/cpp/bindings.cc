@@ -9,6 +9,9 @@
 
 using verona::cpp::make_cown;
 using verona::cpp::when;
+using verona::rt::Cown;
+using verona::rt::Descriptor;
+using verona::rt::Object;
 using verona::rt::Scheduler;
 using verona::rt::VCown;
 
@@ -141,5 +144,21 @@ extern "C"
   int32_t boxcars_add(int32_t a, int32_t b)
   {
     return a + b;
+  }
+
+  void boxcars_test_descriptor_info(size_t* size, size_t* align)
+  {
+    *size = sizeof(Descriptor);
+    *align = alignof(Descriptor);
+  }
+
+  void boxcars_allocate_cown(Descriptor* desc, Cown** out)
+  {
+    size_t size = desc->size;
+    void* base = snmalloc::ThreadAlloc::get().alloc(size);
+    Object* obj = Object::register_object(base, desc);
+    Cown* cown = new (obj) Cown();
+
+    *out = cown;
   }
 }

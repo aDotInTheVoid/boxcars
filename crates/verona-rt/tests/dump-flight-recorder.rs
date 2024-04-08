@@ -5,6 +5,8 @@ use verona_rt::{log, with_scheduler};
 // cargo test --test dump-flight-recorder --features flight_recorder
 
 #[test]
+#[cfg_attr(feature = "asan", ignore = "we intentionally leak memory here")]
+
 fn main() {
     unsafe {
         verona_rt_sys::enable_logging();

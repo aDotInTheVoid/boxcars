@@ -54,9 +54,9 @@ mod cown;
 mod descriptor;
 mod log;
 mod scheduler;
-mod when;
+// mod when;
 
 pub use cown::CownPtr;
 pub use log::log;
 pub use scheduler::{with as with_scheduler, with_leak_detector};
-pub use when::{when, when2, AcquiredCown};
+// pub use when::{when, when2, AcquiredCown};

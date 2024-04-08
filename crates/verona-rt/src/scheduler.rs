@@ -11,6 +11,8 @@ use ffi::scheduler_get;
 /// TODO: Understand init/run well.
 use verona_rt_sys as ffi;
 
+use crate::log;
+
 fn get() -> ffi::Scheduler {
     // TODO: Is it worth caching the returned pointer?
 
@@ -50,6 +52,7 @@ pub fn with_inner<T, F: FnOnce() -> T>(f: F, detect_leaks: bool) -> T {
 
     if detect_leaks {
         unsafe {
+            log(c"running leak detector");
             if ffi::schedular_has_leaks() {
                 panic!("leaks detected");
             }

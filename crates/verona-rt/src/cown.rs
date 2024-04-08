@@ -1,11 +1,8 @@
-use core::{
-    fmt,
-    marker::PhantomData,
-    mem::{self, MaybeUninit},
-    ptr,
-};
+use core::{fmt, marker::PhantomData, mem::MaybeUninit, ptr};
 
 use verona_rt_sys as ffi;
+
+use crate::descriptor::get_desc;
 
 // See docs/layout.md for how this works.
 
@@ -57,17 +54,16 @@ impl<T> fmt::Pointer for CownPtr<T> {
 
 impl<T> core::ops::Drop for CownPtr<T> {
     fn drop(&mut self) {
-        unsafe { ffi::boxcar_cownptr_drop(&mut self.cown_ptr) };
+        unsafe { ffi::boxcars_release_object(self.cown_ptr) };
     }
 }
 
 impl<T> Clone for crate::cown::CownPtr<T> {
     fn clone(&self) -> Self {
         unsafe {
-            let mut new = mem::zeroed();
-            ffi::boxcar_cownptr_clone(&self.cown_ptr, &mut new);
+            ffi::boxcars_acquire_object(self.cown_ptr);
             Self {
-                cown_ptr: new,
+                cown_ptr: self.cown_ptr,
                 _marker: PhantomData,
             }
         }
@@ -106,17 +102,12 @@ const fn align_up(value: usize, alignment: usize) -> usize {
 }
 
 impl<T> CownPtr<T> {
-    const ALLOCATION_SIZE: usize = vsizeof::<CownDataToxic<T>>();
-
     /// Must be inside a runtime.
     // TODO: Enforce that.
     pub fn new(value: T) -> Self {
         unsafe {
-            // The C++ code called here will read from the old value of cown to attempt to free it.
-            // Luckely for us, `nullptr` is a valid value for a cown_ptr, and we can create one easily.
-            let mut cown_ptr = mem::zeroed();
-
-            ffi::boxcar_cownptr_new(Self::ALLOCATION_SIZE, drop_glue::<T>, &mut cown_ptr);
+            let desc = get_desc::<T>();
+            let cown_ptr = ffi::boxcars_allocate_cown(&desc);
 
             let this = Self {
                 cown_ptr,
@@ -185,29 +176,6 @@ mod tests {
             drop(x);
             drop(y);
         });
-    }
-
-    #[test]
-    fn actualcown_constats_right() {
-        let mut sizeof_actualcown = 0;
-        let mut alignof_actualcown = 0;
-        let mut sizeof_object_header = 0;
-        let mut object_alignment = 0;
-
-        unsafe {
-            ffi::boxcar_size_info(
-                &mut sizeof_actualcown,
-                &mut alignof_actualcown,
-                &mut sizeof_object_header,
-                &mut object_alignment,
-            );
-        }
-
-        assert_eq!(std::mem::size_of::<ActualCown>(), sizeof_actualcown);
-        assert_eq!(std::mem::align_of::<ActualCown>(), alignof_actualcown);
-
-        assert_eq!(sizeof_object_header, SIZEOF_OBJECT_HEADER);
-        assert_eq!(object_alignment, OBJECT_ALIGNMENT)
     }
 
     #[test]

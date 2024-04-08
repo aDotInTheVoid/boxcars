@@ -81,8 +81,19 @@ extern "C" fn drop_glue<T>(cown: *mut ()) {
     }
 }
 
-const SIZEOF_OBJECT_HEADER: usize = 16;
 const OBJECT_ALIGNMENT: usize = 16;
+
+const SIZEOF_OBJECT_HEADER: usize = {
+    #[repr(C, align(16))]
+    // #[alignas(16)]
+    struct ObjectHeader {
+        _a: usize,
+        _b: usize,
+        #[cfg(feature = "systematic_testing")]
+        _c: usize,
+    }
+    std::mem::size_of::<ObjectHeader>()
+};
 const fn vsizeof<T>() -> usize {
     use std::mem::size_of;
     // The runtime stores an object header below the returned pointer, but we still need space for it in the allocation.

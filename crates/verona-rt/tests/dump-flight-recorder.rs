@@ -11,7 +11,7 @@ fn main() {
     }
 
     with_scheduler(|| {
-        log(cstr::cstr!("Hello World\n"));
+        log(c"Hello World\n");
 
         // TODO: Less rigamarole
         let v = format!("{} + {} == {}\n", 2, 3, 2 + 3);

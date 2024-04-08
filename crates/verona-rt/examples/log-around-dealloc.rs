@@ -1,4 +1,3 @@
-use cstr::cstr;
 use verona_rt_sys as ffi;
 
 use verona_rt::{log, with_scheduler, CownPtr};
@@ -10,14 +9,14 @@ fn main() {
     }
 
     with_scheduler(|| {
-        log(cstr!("TOP"));
+        log(c"TOP");
         let v1 = CownPtr::new(10);
-        log(cstr!("Just alloced"));
+        log(c"Just alloced");
         let v2 = v1.clone();
-        log(cstr!("Just cloned"));
+        log(c"Just cloned");
         drop(v1);
-        log(cstr!("droped v1"));
+        log(c"droped v1");
         drop(v2);
-        log(cstr!("droped v2"));
+        log(c"droped v2");
     });
 }

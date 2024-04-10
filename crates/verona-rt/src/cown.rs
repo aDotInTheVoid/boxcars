@@ -70,37 +70,6 @@ impl<T> Clone for crate::cown::CownPtr<T> {
     }
 }
 
-extern "C" fn drop_glue<T>(cown: *mut ()) {
-    let data_ptr = cown_to_data::<T>(cown);
-    unsafe {
-        ptr::drop_in_place(data_ptr);
-    }
-}
-
-const OBJECT_ALIGNMENT: usize = 16;
-
-const SIZEOF_OBJECT_HEADER: usize = {
-    #[repr(C, align(16))]
-    // #[alignas(16)]
-    struct ObjectHeader {
-        _a: usize,
-        _b: usize,
-        #[cfg(feature = "systematic_testing")]
-        _c: usize,
-    }
-    std::mem::size_of::<ObjectHeader>()
-};
-pub(crate) const fn vsizeof<T>() -> usize {
-    use std::mem::size_of;
-    // The runtime stores an object header below the returned pointer, but we still need space for it in the allocation.
-    align_up(size_of::<T>() + SIZEOF_OBJECT_HEADER, OBJECT_ALIGNMENT)
-}
-const fn align_up(value: usize, alignment: usize) -> usize {
-    assert!(alignment.is_power_of_two());
-    let align_1 = alignment - 1;
-    return (value + align_1) & !align_1;
-}
-
 impl<T> CownPtr<T> {
     /// Must be inside a runtime.
     // TODO: Enforce that.

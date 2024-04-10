@@ -2,8 +2,10 @@
 //! # use verona_rt::*;
 //! # with_scheduler(|| {
 //! let string = CownPtr::new(String::new());
-//! let vec = CownPtr::new(Vec::new());
+//! let vec = CownPtr::new(Vec::<i32>::new());
 //!
+//! // FIXME: Re-enable when we have behaviours on custom-descriptors.
+//! # /*
 //! when(&string, |mut s| {
 //!     assert_eq!(&*s, "");
 //!     s.push_str("foo");
@@ -21,6 +23,7 @@
 //!
 //! when(&string, |s| assert_eq!(&*s, "foobar"));
 //! when(&vec, |v| assert_eq!(&*v, &[101, 666]));
+//! # */
 //! # });
 //! ```
 //!

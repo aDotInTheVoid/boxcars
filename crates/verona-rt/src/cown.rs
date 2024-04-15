@@ -13,10 +13,16 @@ pub struct CownPtr<T> {
 }
 
 #[repr(C)]
-/// It's never safe to dereference this type, or even to construct one.
-pub(crate) struct CownDataToxic<T> {
+#[derive(Debug)]
+// Corresponds to verona::rt::Cown.
+struct OpaqueCown {
+    _marker: MaybeUninit<[*const (); 4]>,
+}
+
+#[repr(C)]
+pub(crate) struct CownData<T> {
     // Must be first, so we can convert pointers between the two.
-    cown: ActualCown,
+    cown: OpaqueCown,
     data: T,
 }
 
@@ -24,7 +30,7 @@ pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
     debug_assert!(!ptr.is_null());
     debug_assert!((ptr as usize) & 15 == 0, "{ptr:p} not 16 bit aligned");
 
-    let p = ptr as *mut CownDataToxic<T>;
+    let p = ptr as *mut CownData<T>;
 
     unsafe { ptr::addr_of_mut!((*p).data) }
 }
@@ -38,12 +44,6 @@ impl<T> CownPtr<T> {
     unsafe fn yolo_data(&mut self) -> &mut T {
         &mut *(self.data_ptr() as *mut T)
     }
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct ActualCown {
-    _marker: MaybeUninit<[*const (); 4]>,
 }
 
 impl<T> fmt::Pointer for CownPtr<T> {

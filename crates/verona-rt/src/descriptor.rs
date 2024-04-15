@@ -4,11 +4,11 @@ use verona_rt_sys::descriptor as ffi;
 use verona_rt_sys::descriptor::{Descriptor, Object};
 use verona_rt_sys::vsizeof;
 
-use crate::cown::cown_to_data;
+use crate::cown::{cown_to_data, CownData};
 
 /// `static Descriptor* desc()` in `vobject.h`
 const fn make_desciptor<T>() -> Descriptor {
-    let size = vsizeof::<T>();
+    let size = vsizeof::<CownData<T>>();
 
     ffi::Descriptor {
         size,

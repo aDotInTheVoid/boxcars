@@ -117,7 +117,7 @@ extern "C"
 
   Cown* boxcars_allocate_cown(Descriptor* desc)
   {
-    size_t size = desc->size + 1000; // TODO: Don't do this :(
+    size_t size = desc->size;
     void* base = snmalloc::ThreadAlloc::get().alloc(size);
 
     Logging::cout() << "Allocated " << size << " bytes cown at " << base

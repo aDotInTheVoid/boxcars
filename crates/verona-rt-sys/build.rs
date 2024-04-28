@@ -11,6 +11,12 @@ fn main() {
     if cfg!(feature = "flight_recorder") {
         cmake_build.define("USE_CRASH_LOGGING", "ON");
     }
+    if cfg!(feature = "snmalloc_tracing") {
+        cmake_build.define("SNMALLOC_TRACING", "ON");
+    }
+    if cfg!(feature = "asan") {
+        cmake_build.define("SANITIZER", "address");
+    }
 
     // https://github.com/aDotInTheVoid/boxcars/issues/1#issuecomment-1812070337
     cmake_build.define("VERONA_RT_ONLY_HEADER_LIBRARY", "ON");

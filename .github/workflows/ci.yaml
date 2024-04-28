@@ -21,3 +21,5 @@ jobs:
     - run: cargo build --all
     - run: cargo test --all
     - run: cargo test --all --features flight_recorder
+    # TODO: Test under systematic_testing.
+    # RUSTFLAGS=-Zsanitizer=address cargo +nightly nextest run --features asan 

@@ -1,13 +1,8 @@
-use core::{
-    fmt,
-    marker::PhantomData,
-    mem::{self, MaybeUninit},
-    ptr,
-};
+use core::{fmt, marker::PhantomData, ptr};
 
 use verona_rt_sys as ffi;
 
-// See docs/layout.md for how this works.
+use crate::descriptor::get_desc;
 
 pub struct CownPtr<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
@@ -16,10 +11,9 @@ pub struct CownPtr<T> {
 }
 
 #[repr(C)]
-/// It's never safe to dereference this type, or even to construct one.
-pub(crate) struct CownDataToxic<T> {
+pub(crate) struct CownData<T> {
     // Must be first, so we can convert pointers between the two.
-    cown: ActualCown,
+    cown: ffi::OpaqueCown,
     data: T,
 }
 
@@ -27,7 +21,7 @@ pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
     debug_assert!(!ptr.is_null());
     debug_assert!((ptr as usize) & 15 == 0, "{ptr:p} not 16 bit aligned");
 
-    let p = ptr as *mut CownDataToxic<T>;
+    let p = ptr as *mut CownData<T>;
 
     unsafe { ptr::addr_of_mut!((*p).data) }
 }
@@ -43,12 +37,6 @@ impl<T> CownPtr<T> {
     }
 }
 
-#[repr(C)]
-#[derive(Debug)]
-struct ActualCown {
-    _marker: MaybeUninit<[*const (); 4]>,
-}
-
 impl<T> fmt::Pointer for CownPtr<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Pointer::fmt(&self.cown_ptr.addr(), f)
@@ -57,66 +45,29 @@ impl<T> fmt::Pointer for CownPtr<T> {
 
 impl<T> core::ops::Drop for CownPtr<T> {
     fn drop(&mut self) {
-        unsafe { ffi::boxcar_cownptr_drop(&mut self.cown_ptr) };
+        unsafe { ffi::boxcars_release_object(self.cown_ptr) };
     }
 }
 
 impl<T> Clone for crate::cown::CownPtr<T> {
     fn clone(&self) -> Self {
         unsafe {
-            let mut new = mem::zeroed();
-            ffi::boxcar_cownptr_clone(&self.cown_ptr, &mut new);
+            ffi::boxcars_acquire_object(self.cown_ptr);
             Self {
-                cown_ptr: new,
+                cown_ptr: self.cown_ptr,
                 _marker: PhantomData,
             }
         }
     }
 }
 
-extern "C" fn drop_glue<T>(cown: *mut ()) {
-    let data_ptr = cown_to_data::<T>(cown);
-    unsafe {
-        ptr::drop_in_place(data_ptr);
-    }
-}
-
-const OBJECT_ALIGNMENT: usize = 16;
-
-const SIZEOF_OBJECT_HEADER: usize = {
-    #[repr(C, align(16))]
-    // #[alignas(16)]
-    struct ObjectHeader {
-        _a: usize,
-        _b: usize,
-        #[cfg(feature = "systematic_testing")]
-        _c: usize,
-    }
-    std::mem::size_of::<ObjectHeader>()
-};
-const fn vsizeof<T>() -> usize {
-    use std::mem::size_of;
-    // The runtime stores an object header below the returned pointer, but we still need space for it in the allocation.
-    align_up(size_of::<T>() + SIZEOF_OBJECT_HEADER, OBJECT_ALIGNMENT)
-}
-const fn align_up(value: usize, alignment: usize) -> usize {
-    assert!(alignment.is_power_of_two());
-    let align_1 = alignment - 1;
-    return (value + align_1) & !align_1;
-}
-
 impl<T> CownPtr<T> {
-    const ALLOCATION_SIZE: usize = vsizeof::<CownDataToxic<T>>();
-
     /// Must be inside a runtime.
     // TODO: Enforce that.
     pub fn new(value: T) -> Self {
         unsafe {
-            // The C++ code called here will read from the old value of cown to attempt to free it.
-            // Luckely for us, `nullptr` is a valid value for a cown_ptr, and we can create one easily.
-            let mut cown_ptr = mem::zeroed();
-
-            ffi::boxcar_cownptr_new(Self::ALLOCATION_SIZE, drop_glue::<T>, &mut cown_ptr);
+            let desc = get_desc::<T>();
+            let cown_ptr = ffi::boxcars_allocate_cown(desc);
 
             let this = Self {
                 cown_ptr,
@@ -185,29 +136,6 @@ mod tests {
             drop(x);
             drop(y);
         });
-    }
-
-    #[test]
-    fn actualcown_constats_right() {
-        let mut sizeof_actualcown = 0;
-        let mut alignof_actualcown = 0;
-        let mut sizeof_object_header = 0;
-        let mut object_alignment = 0;
-
-        unsafe {
-            ffi::boxcar_size_info(
-                &mut sizeof_actualcown,
-                &mut alignof_actualcown,
-                &mut sizeof_object_header,
-                &mut object_alignment,
-            );
-        }
-
-        assert_eq!(std::mem::size_of::<ActualCown>(), sizeof_actualcown);
-        assert_eq!(std::mem::align_of::<ActualCown>(), alignof_actualcown);
-
-        assert_eq!(sizeof_object_header, SIZEOF_OBJECT_HEADER);
-        assert_eq!(object_alignment, OBJECT_ALIGNMENT)
     }
 
     #[test]

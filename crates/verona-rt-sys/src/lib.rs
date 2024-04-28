@@ -4,8 +4,15 @@
 //!
 //! This is a research project, and is at an early stage of development. It is not
 //! ready for use outside of research.
+#![cfg_attr(not(test), no_std)]
 
-#[repr(C)]
+use descriptor::Descriptor;
+
+pub mod descriptor;
+mod vsizeof;
+pub use vsizeof::vsizeof;
+
+#[repr(transparent)]
 #[derive(Clone, Copy)]
 /// A reference to a `verona::rt::Scheduler`.
 ///
@@ -15,36 +22,36 @@
 /// Create with [`scheduler_get`]
 pub struct Scheduler(*mut ());
 
-#[repr(C)]
+/// Equivalent to `rt::Cown*` on the C++ side.
+///
 /// This is a reference cointed pointer, so embeders shouldn't
 /// implement Copy.
-///
-/// Must not be moved directly over the FFI boundry, as C++ and rust
-/// use different calling conventions.
-pub struct CownPtr(*mut ());
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct CownPtr {
+    addr: *mut (),
+}
 
 impl CownPtr {
-    pub fn addr(&self) -> *mut () {
-        self.0
-    }
-}
-impl AcquiredCown {
-    pub fn addr(&self) -> *mut () {
-        self.0
+    pub fn addr(self) -> *mut () {
+        self.addr
     }
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct AcquiredCown(*mut ());
+#[derive(Debug)]
+/// `Corresponds to rt::Cown`.
+///
+/// Rust code shouldn't inspect the contents of it, but use it for size/
+/// allignment/pointer arithmatic.
+pub struct OpaqueCown {
+    _marker: core::mem::MaybeUninit<[*const (); 3]>,
+}
 
 pub type Dtor = extern "C" fn(*mut ());
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
-    #[cfg(test)]
-    /// Calculates a+b. Used for testing purposed only.
-    fn boxcars_add(a: i32, b: i32) -> i32;
 
     /// Returns the global `Scheduler`.
     ///
@@ -77,42 +84,39 @@ extern "C" {
     pub fn schedular_set_detect_leaks(detect_leaks: bool);
     pub fn schedular_has_leaks() -> bool;
 
-    pub fn boxcar_cownptr_clone(input: &CownPtr, output: &mut CownPtr);
-    pub fn boxcar_cownptr_drop(ptr: &mut CownPtr);
-    pub fn boxcar_cownptr_new(size: usize, dtor: Dtor, output: &mut CownPtr);
-    pub fn boxcar_acquiredcown_cown(input: &AcquiredCown, out: &mut CownPtr);
+    pub fn boxcars_acquire_object(cown: CownPtr);
+    pub fn boxcars_release_object(cown: CownPtr);
 
-    pub fn boxcar_size_info(
-        sizeof_actualcown: &mut usize,
-        alignof_actualcown: &mut usize,
-        sizeof_object_header: &mut usize,
-        object_alignment: &mut usize,
-    );
+    pub fn boxcars_allocate_cown(descriptor: &'static Descriptor) -> CownPtr;
 
-    pub fn boxcar_when1(
-        cown: &CownPtr,
-        func: extern "C" fn(&mut AcquiredCown, *mut ()),
-        data: *mut (),
-    );
-    pub fn boxcar_when2(
-        c1: &CownPtr,
-        c2: &CownPtr,
-        func: extern "C" fn(&mut AcquiredCown, &mut AcquiredCown, *mut ()),
+    pub fn boxcars_schedule_1(cown: CownPtr, func: extern "C" fn(CownPtr, *mut ()), data: *mut ());
+    pub fn boxcars_schedule_2(
+        c1: CownPtr,
+        c2: CownPtr,
+        func: extern "C" fn(CownPtr, CownPtr, *mut ()),
         data: *mut (),
     );
 
     pub fn enable_logging();
     pub fn dump_flight_recorder();
 
-    pub fn boxcar_log_cstr(ptr: *const std::ffi::c_char);
+    pub fn boxcar_log_cstr(ptr: *const core::ffi::c_char);
     pub fn boxcar_log_usize(n: usize);
     pub fn boxcar_log_ptr(p: *const ());
     pub fn boxcar_log_endl();
 }
 
 #[test]
-fn add_ints() {
-    unsafe {
-        assert_eq!(boxcars_add(1, 2), 3);
+fn cown_size_and_align() {
+    #[link(name = "boxcar_bindings")]
+    extern "C" {
+        fn boxcars_test_cown_info(size: &mut usize, align: &mut usize);
     }
+    let mut size = 0;
+    let mut align = 0;
+    unsafe {
+        boxcars_test_cown_info(&mut size, &mut align);
+    }
+    assert_eq!(size, std::mem::size_of::<OpaqueCown>());
+    assert_eq!(align, std::mem::align_of::<OpaqueCown>())
 }

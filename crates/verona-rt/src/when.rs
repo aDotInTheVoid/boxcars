@@ -8,7 +8,7 @@ use crate::cown::CownPtr;
 pub struct AcquiredCown<'a, T> {
     // TODO: As an optimization, point to the `T`, and roll the pointer back to
     // find the cown, (instead of pointing to cown, and going forward to T).
-    ptr: ffi::AcquiredCown,
+    ptr: ffi::CownPtr,
     marker: PhantomData<&'a mut T>,
 }
 
@@ -43,24 +43,20 @@ impl<'a, T: fmt::Display> fmt::Display for AcquiredCown<'a, T> {
     }
 }
 
-unsafe fn make_aq<'a, T>(aq: &mut ffi::AcquiredCown) -> AcquiredCown<'a, T> {
+unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
     AcquiredCown {
-        ptr: *aq,
+        ptr: aq,
         marker: PhantomData,
     }
 }
 
-extern "C" fn trampoline1<T>(aq: &mut ffi::AcquiredCown, data: *mut ()) {
+extern "C" fn trampoline1<T>(aq: ffi::CownPtr, data: *mut ()) {
     unsafe {
         let func = mem::transmute::<_, UseFunc1<T>>(data);
         func(make_aq(aq));
     }
 }
-extern "C" fn trampoline2<T, U>(
-    a1: &mut ffi::AcquiredCown,
-    a2: &mut ffi::AcquiredCown,
-    data: *mut (),
-) {
+extern "C" fn trampoline2<T, U>(a1: ffi::CownPtr, a2: ffi::CownPtr, data: *mut ()) {
     unsafe {
         let func: UseFunc2<T, U> = mem::transmute(data);
         func(make_aq(a1), make_aq(a2));
@@ -73,9 +69,11 @@ type UseFunc2<T, U> = for<'a, 'b> fn(AcquiredCown<'a, T>, AcquiredCown<'b, U>);
 pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
     let trampoline = trampoline1::<T>;
 
-    unsafe {
-        ffi::boxcar_when1(&cown.cown_ptr, trampoline, f as _);
-    }
+    unsafe { ffi::boxcars_schedule_1(cown.cown_ptr, trampoline, f as *mut ()) }
+
+    // unsafe {
+    //     ffi::boxcar_when1(&cown.cown_ptr, trampoline, f as _);
+    // }
 }
 
 pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
@@ -89,7 +87,7 @@ pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
 
     let trampoline = trampoline2::<T, U>;
     unsafe {
-        ffi::boxcar_when2(&c1.cown_ptr, &c2.cown_ptr, trampoline, f as _);
+        ffi::boxcars_schedule_2(c1.cown_ptr, c2.cown_ptr, trampoline, f as _);
     }
 }
 

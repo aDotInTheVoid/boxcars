@@ -1,3 +1,5 @@
+TODO: This was before the descriptor change. It needs to be rewrote.
+
 # Memory Layout.
 
 It's usefull to understand how verona-rt lays thing out in memory.

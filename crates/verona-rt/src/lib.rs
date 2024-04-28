@@ -2,7 +2,7 @@
 //! # use verona_rt::*;
 //! # with_scheduler(|| {
 //! let string = CownPtr::new(String::new());
-//! let vec = CownPtr::new(Vec::new());
+//! let vec = CownPtr::new(Vec::<i32>::new());
 //!
 //! when(&string, |mut s| {
 //!     assert_eq!(&*s, "");
@@ -51,6 +51,7 @@
 // #![no_std]
 
 mod cown;
+mod descriptor;
 mod log;
 mod scheduler;
 mod when;

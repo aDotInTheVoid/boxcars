@@ -14,4 +14,9 @@ cstr = "0.2.11" # TODO: Remove
 systematic_testing = ["verona-rt-sys/systematic_testing"]
 flight_recorder = ["verona-rt-sys/flight_recorder"]
 snmalloc_tracing = ["verona-rt-sys/snmalloc_tracing"]
-asan = ["verona-rt-sys/asan"] 
+
+sanitizer_address = ["__any_sanitizer", "verona-rt-sys/sanitizer_address"] 
+sanitizer_thread  = ["__any_sanitizer", "verona-rt-sys/sanitizer_thread"]
+
+# Only for cfg's
+__any_sanitizer = []

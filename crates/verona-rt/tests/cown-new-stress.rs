@@ -1,10 +1,10 @@
 use std::thread;
 
-use verona_rt::{with_scheduler, CownPtr};
+use verona_rt::{with_leak_detector, CownPtr};
 
 #[test]
 fn main() {
-    with_scheduler(|| {
+    with_leak_detector(|| {
         thread::scope(|s| {
             for _ in 0..10 {
                 s.spawn(|| {

@@ -20,3 +20,9 @@ cd crates/verona-rt-sys/cpp
 cmake -B build -GNinja -D VERONA_RT_ONLY_HEADER_LIBRARY=ON
 ninja -C build
 ```
+
+### Santizers
+
+```rust
+RUSTFLAGS="-Zsanitizer=thread" cargo +nightly test -Zbuild-std --target x86_64-unknown-linux-gnu --test cown-minimal
+```

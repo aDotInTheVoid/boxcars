@@ -5,6 +5,7 @@
 //! This is a research project, and is at an early stage of development. It is not
 //! ready for use outside of research.
 #![cfg_attr(not(test), no_std)]
+use core::fmt;
 
 use descriptor::Descriptor;
 
@@ -30,6 +31,12 @@ pub struct Scheduler(*mut ());
 #[repr(transparent)]
 pub struct CownPtr {
     addr: *mut (),
+}
+
+impl fmt::Pointer for CownPtr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:p}", self.addr)
+    }
 }
 
 impl CownPtr {

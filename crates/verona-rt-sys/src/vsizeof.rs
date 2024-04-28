@@ -27,7 +27,7 @@ const fn align_up(value: usize, alignment: usize) -> usize {
     // port of align_up from snmalloc/ds_core/bits.h
     assert!(alignment.is_power_of_two());
     let align_1 = alignment - 1;
-    return (value + align_1) & !align_1;
+    (value + align_1) & !align_1
 }
 
 #[cfg(test)]

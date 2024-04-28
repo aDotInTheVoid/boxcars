@@ -67,7 +67,7 @@ impl<T> CownPtr<T> {
     pub fn new(value: T) -> Self {
         unsafe {
             let desc = get_desc::<T>();
-            let cown_ptr = ffi::boxcars_allocate_cown(&desc);
+            let cown_ptr = ffi::boxcars_allocate_cown(desc);
 
             let this = Self {
                 cown_ptr,

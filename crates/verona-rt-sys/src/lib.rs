@@ -21,12 +21,12 @@ pub use vsizeof::vsizeof;
 /// Create with [`scheduler_get`]
 pub struct Scheduler(*mut ());
 
-#[repr(transparent)]
 /// This is a reference cointed pointer, so embeders shouldn't
 /// implement Copy.
 ///
 /// Equivalent to `rt::Cown*` on the C++ side.
 #[derive(Clone, Copy)]
+#[repr(transparent)]
 pub struct CownPtr(*mut ());
 
 impl CownPtr {
@@ -85,17 +85,13 @@ extern "C" {
 
     pub fn boxcars_allocate_cown(descriptor: &'static Descriptor) -> CownPtr;
 
-    // pub fn boxcar_when1(
-    //     cown: &CownPtr,
-    //     func: extern "C" fn(&mut AcquiredCown, *mut ()),
-    //     data: *mut (),
-    // );
-    // pub fn boxcar_when2(
-    //     c1: &CownPtr,
-    //     c2: &CownPtr,
-    //     func: extern "C" fn(&mut AcquiredCown, &mut AcquiredCown, *mut ()),
-    //     data: *mut (),
-    // );
+    pub fn boxcars_schedule_1(cown: CownPtr, func: extern "C" fn(CownPtr, *mut ()), data: *mut ());
+    pub fn boxcars_schedule_2(
+        c1: CownPtr,
+        c2: CownPtr,
+        func: extern "C" fn(CownPtr, CownPtr, *mut ()),
+        data: *mut (),
+    );
 
     pub fn enable_logging();
     pub fn dump_flight_recorder();

@@ -25,6 +25,10 @@ using ActualCown = verona::cpp::ActualCown<int>;
 static_assert(sizeof(void*) == sizeof(size_t));
 static_assert(sizeof(void*) == sizeof(ptrdiff_t));
 
+typedef void (*WhenNFunc)(size_t, Cown**, void*);
+typedef void (*When1Func)(Cown*, void*);
+typedef void (*When2Func)(Cown*, Cown*, void*);
+
 extern "C"
 {
   /*
@@ -132,20 +136,17 @@ extern "C"
     return cown;
   }
 
-  // void
-  // boxcar_when1(cown_ptr* cown, void (*func)(acquired_cown*, void*), void*
-  // data)
-  // {
-  //   when(*cown) << [=](acquired_cown acq) { func(&acq, data); };
-  // }
-  // void boxcar_when2(
-  //   cown_ptr* c1,
-  //   cown_ptr* c2,
-  //   void (*func)(acquired_cown*, acquired_cown*, void*),
-  //   void* data)
-  // {
-  //   when(*c1, *c2) << [=](auto a1, auto a2) { func(&a1, &a2, data); };
-  // }
+  // TODO: Use requests
+  // TODO: Variadic.
+  void boxcars_schedule_1(Cown* cown, When1Func func, void* data)
+  {
+    verona::rt::schedule_lambda(cown, [=]() { func(cown, data); });
+  }
+  void boxcars_schedule_2(Cown* c1, Cown* c2, When2Func func, void* data)
+  {
+    Cown* cowns[2] = {c1, c2};
+    verona::rt::schedule_lambda(2, cowns, [=]() { func(c1, c2, data); });
+  }
 
   void boxcars_test_descriptor_info(size_t* size, size_t* align)
   {

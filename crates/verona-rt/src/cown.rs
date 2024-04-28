@@ -15,7 +15,7 @@ pub struct CownPtr<T> {
 #[repr(C)]
 #[derive(Debug)]
 // Corresponds to verona::rt::Cown.
-struct OpaqueCown {
+pub(crate) struct OpaqueCown {
     _marker: MaybeUninit<[*const (); 4]>,
 }
 

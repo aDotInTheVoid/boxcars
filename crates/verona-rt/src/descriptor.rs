@@ -20,7 +20,7 @@ const fn make_desciptor<T>() -> Descriptor {
 }
 
 extern "C" fn drop_glue_for<T>(obj: *mut Object) {
-    let t_ptr: *mut T = cown_to_data(obj as _);
+    let t_ptr: *mut T = cown_to_data::<T>(obj as _);
     unsafe { ptr::drop_in_place(t_ptr) }
 }
 
@@ -34,6 +34,8 @@ impl<T> Hack for T {
     const DESC: &'static Descriptor = &make_desciptor::<T>();
 }
 pub(crate) const fn get_desc<T>() -> &'static Descriptor {
+    // TODO: Use this when inline const gets stabilized.
+    // &const { make_desciptor::<T>() }
     <T as Hack>::DESC
 }
 

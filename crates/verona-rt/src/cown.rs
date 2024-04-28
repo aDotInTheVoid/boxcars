@@ -1,10 +1,8 @@
-use core::{fmt, marker::PhantomData, mem::MaybeUninit, ptr};
+use core::{fmt, marker::PhantomData, ptr};
 
 use verona_rt_sys as ffi;
 
 use crate::descriptor::get_desc;
-
-// See docs/layout.md for how this works.
 
 pub struct CownPtr<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
@@ -13,16 +11,9 @@ pub struct CownPtr<T> {
 }
 
 #[repr(C)]
-#[derive(Debug)]
-// Corresponds to verona::rt::Cown.
-pub(crate) struct OpaqueCown {
-    _marker: MaybeUninit<[*const (); 4]>,
-}
-
-#[repr(C)]
 pub(crate) struct CownData<T> {
     // Must be first, so we can convert pointers between the two.
-    cown: OpaqueCown,
+    cown: ffi::OpaqueCown,
     data: T,
 }
 

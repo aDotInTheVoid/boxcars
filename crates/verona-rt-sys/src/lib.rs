@@ -4,6 +4,7 @@
 //!
 //! This is a research project, and is at an early stage of development. It is not
 //! ready for use outside of research.
+#![cfg_attr(not(test), no_std)]
 
 use descriptor::Descriptor;
 
@@ -21,28 +22,31 @@ pub use vsizeof::vsizeof;
 /// Create with [`scheduler_get`]
 pub struct Scheduler(*mut ());
 
+/// Equivalent to `rt::Cown*` on the C++ side.
+///
 /// This is a reference cointed pointer, so embeders shouldn't
 /// implement Copy.
-///
-/// Equivalent to `rt::Cown*` on the C++ side.
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct CownPtr(*mut ());
+pub struct CownPtr {
+    addr: *mut (),
+}
 
 impl CownPtr {
-    pub fn addr(&self) -> *mut () {
-        self.0
-    }
-}
-impl AcquiredCown {
-    pub fn addr(&self) -> *mut () {
-        self.0
+    pub fn addr(self) -> *mut () {
+        self.addr
     }
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct AcquiredCown(*mut ());
+#[derive(Debug)]
+/// `Corresponds to rt::Cown`.
+///
+/// Rust code shouldn't inspect the contents of it, but use it for size/
+/// allignment/pointer arithmatic.
+pub struct OpaqueCown {
+    _marker: core::mem::MaybeUninit<[*const (); 3]>,
+}
 
 pub type Dtor = extern "C" fn(*mut ());
 
@@ -96,8 +100,23 @@ extern "C" {
     pub fn enable_logging();
     pub fn dump_flight_recorder();
 
-    pub fn boxcar_log_cstr(ptr: *const std::ffi::c_char);
+    pub fn boxcar_log_cstr(ptr: *const core::ffi::c_char);
     pub fn boxcar_log_usize(n: usize);
     pub fn boxcar_log_ptr(p: *const ());
     pub fn boxcar_log_endl();
+}
+
+#[test]
+fn cown_size_and_align() {
+    #[link(name = "boxcar_bindings")]
+    extern "C" {
+        fn boxcars_test_cown_info(size: &mut usize, align: &mut usize);
+    }
+    let mut size = 0;
+    let mut align = 0;
+    unsafe {
+        boxcars_test_cown_info(&mut size, &mut align);
+    }
+    assert_eq!(size, std::mem::size_of::<OpaqueCown>());
+    assert_eq!(align, std::mem::align_of::<OpaqueCown>())
 }

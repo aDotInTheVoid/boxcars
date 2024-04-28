@@ -3,19 +3,13 @@ use std::ops::Deref;
 
 use verona_rt_sys as ffi;
 
-use crate::cown::{CownPtr, OpaqueCown};
+use crate::cown::CownPtr;
 
 pub struct AcquiredCown<'a, T> {
     // TODO: As an optimization, point to the `T`, and roll the pointer back to
     // find the cown, (instead of pointing to cown, and going forward to T).
     ptr: ffi::CownPtr,
     marker: PhantomData<&'a mut T>,
-}
-
-type ErasedFunc = extern "C" fn(count: usize, *const *const OpaqueCown, *mut ());
-
-extern "C" {
-    fn boxcars_schedule_behaviour(count: usize, cowns: *const *const OpaqueCown);
 }
 
 impl<'a, T> AcquiredCown<'a, T> {

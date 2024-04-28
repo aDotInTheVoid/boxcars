@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem;
 
 // Only used for size calculations.
 #[allow(dead_code)]
@@ -11,15 +11,20 @@ struct ObjectHeader {
     f3: *mut (),
 }
 
-const SIZEOF_OBJECT_HEADER: usize = size_of::<ObjectHeader>();
-const OBJECT_ALIGNMENT: usize = std::mem::align_of::<ObjectHeader>();
+const SIZEOF_OBJECT_HEADER: usize = mem::size_of::<ObjectHeader>();
+const OBJECT_ALIGNMENT: usize = mem::align_of::<ObjectHeader>();
 
+/// Returns the size required for a Verona object to embed the rust object T.
+///
+// The runtime stores an object header below the returned pointer, but we still
+// need space for it in the allocation.
 pub const fn vsizeof<T>() -> usize {
-    // The runtime stores an object header below the returned pointer, but we still need space for it in the allocation.
-    align_up(size_of::<T>() + SIZEOF_OBJECT_HEADER, OBJECT_ALIGNMENT)
+    // port of vsizeof from rt/object/object.h
+    align_up(mem::size_of::<T>() + SIZEOF_OBJECT_HEADER, OBJECT_ALIGNMENT)
 }
 
 const fn align_up(value: usize, alignment: usize) -> usize {
+    // port of align_up from snmalloc/ds_core/bits.h
     assert!(alignment.is_power_of_two());
     let align_1 = alignment - 1;
     return (value + align_1) & !align_1;

@@ -1,25 +1,19 @@
+// TODO: Include what you use.
 // std
-#include <bit>
-#include <cstdint>
-#include <string_view>
+#include <array>
+#include <ostream>
+#include <stddef.h>
+#include <stdint.h>
 // verona
-#include <cpp/cown.h>
-#include <cpp/when.h>
+#include <cpp/lambdabehaviour.h>
+#include <object/object.h>
+#include <sched/cown.h>
 #include <sched/schedulerthread.h>
-
-using verona::cpp::make_cown;
-using verona::cpp::when;
 
 using verona::rt::Cown;
 using verona::rt::Descriptor;
 using verona::rt::Object;
 using verona::rt::Scheduler;
-using verona::rt::VCown;
-
-// TODO: Remove these
-using cown_ptr = verona::cpp::cown_ptr<int>;
-using acquired_cown = verona::cpp::acquired_cown<int>;
-using ActualCown = verona::cpp::ActualCown<int>;
 
 // Sane Rust platform assumptions.
 static_assert(sizeof(void*) == sizeof(size_t));
@@ -96,7 +90,6 @@ extern "C"
   {
     Cown::acquire(o);
   }
-
   void boxcars_release_object(Cown* o)
   {
     auto& alloc = verona::rt::ThreadAlloc::get();
@@ -124,9 +117,6 @@ extern "C"
     size_t size = desc->size;
     void* base = snmalloc::ThreadAlloc::get().alloc(size);
 
-    Logging::cout() << "Allocated " << size << " bytes cown at " << base
-                    << Logging::endl;
-
     Object* obj = Object::register_object(base, desc);
 
     Cown* cown = new (obj) Cown();
@@ -152,5 +142,11 @@ extern "C"
   {
     *size = sizeof(Descriptor);
     *align = alignof(Descriptor);
+  }
+
+  void boxcars_test_cown_info(size_t* size, size_t* align)
+  {
+    *size = sizeof(Cown);
+    *align = alignof(Cown);
   }
 }

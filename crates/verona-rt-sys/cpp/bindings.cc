@@ -61,8 +61,14 @@ extern "C"
 
     if (has_leaks)
     {
+      // Double Jeopardy: See if we still have leaks after waiting
+      // a short while for more destructors/gc to run on other threads.
+      //
+      // This is terrible practice to use sleep for sync, but in this case we've
+      // already goofed, and it's usefull to know if the leaks are due to some
+      // race condition here. Origionally added for #21, we'll see if it
+      // remains.
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
       if (!get_has_leaks())
       {
         std::cout << "??? leaks disapeared by magic???" << std::endl;

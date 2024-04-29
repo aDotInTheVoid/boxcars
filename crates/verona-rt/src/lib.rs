@@ -46,6 +46,12 @@
 //! 4. *Don't make a load of schedulers*: Everything should run with the same schedular.
 //!    If you call [`scheduler::with``] on a load of thread, your going to have a bad day
 //!    (unless you like debugging non-reproducible segfaults :)).
+//! 5. *Run thread local destructors*: (Especially if using the leak-dececor), if you don't
+//!     ensure that `thread_local` destructors are run, you'll end up with racy false-positives.
+//!
+//!     Notably [`std::thread::scope`], doesn't gaurentee to run them [if you don't call `.join()`
+//!     on the handles](https://github.com/rust-lang/rust/issues/116237). Thanks to Mara Bos for
+//!     pointing this out to me.
 
 // It'd be nice, see #17, but we need mutex's
 // #![no_std]

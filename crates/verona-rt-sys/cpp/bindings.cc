@@ -47,12 +47,30 @@ extern "C"
   {
     Scheduler::set_detect_leaks(detect_leaks);
   }
-  bool schedular_has_leaks()
+
+  static bool get_has_leaks()
   {
     bool is_ok = true;
     snmalloc::debug_check_empty<snmalloc::Alloc::Config>(&is_ok);
-    // snmalloc::debug_check_empty<snmalloc::Alloc::Config>();
     return !is_ok;
+  }
+
+  bool schedular_has_leaks()
+  {
+    bool has_leaks = get_has_leaks();
+
+    if (has_leaks)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+      if (!get_has_leaks())
+      {
+        std::cout << "??? leaks disapeared by magic???" << std::endl;
+        abort();
+      }
+    }
+
+    return has_leaks;
   }
 
   /*

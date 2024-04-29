@@ -19,3 +19,6 @@ sanitizer_thread  = ["__any_sanitizer", "verona-rt-sys/sanitizer_thread"]
 
 # Only for cfg's
 __any_sanitizer = []
+
+[dev-dependencies]
+stdx = { path = "../stdx" }

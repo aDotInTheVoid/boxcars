@@ -1,7 +1,4 @@
-use std::{
-    thread,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use verona_rt::log_snmalloc;
 use verona_rt::{with_leak_detector, CownPtr};
@@ -21,9 +18,9 @@ fn one_run() {
     with_leak_detector(|| {
         log_snmalloc("!! begin main");
 
-        thread::scope(|s| {
+        stdx::thread::scope(|s| {
             for _ in 0..10 {
-                create_sched_noise(s);
+                create_sched_noise(&s);
 
                 s.spawn(|| {
                     log_snmalloc("!! begin manipulation");
@@ -51,7 +48,7 @@ fn one_run() {
     })
 }
 
-fn create_sched_noise<'a: 'b, 'b>(s: &'a thread::Scope<'b, '_>) {
+fn create_sched_noise(s: &stdx::thread::Scope) {
     for spinc in 1..100 {
         let f = move || {
             for _ in 0..spinc * 100 {

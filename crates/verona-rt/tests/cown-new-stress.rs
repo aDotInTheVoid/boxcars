@@ -1,11 +1,9 @@
-use std::thread;
-
 use verona_rt::{with_leak_detector, CownPtr};
 
 #[test]
 fn main() {
     with_leak_detector(|| {
-        thread::scope(|s| {
+        stdx::thread::scope(|s| {
             for _ in 0..10 {
                 s.spawn(|| {
                     let mut v = Vec::new();

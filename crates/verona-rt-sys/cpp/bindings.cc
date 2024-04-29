@@ -51,12 +51,16 @@ extern "C"
   static bool get_has_leaks()
   {
     bool is_ok = true;
+    Logging::cout() << "Checking for leaks" << std::endl;
     snmalloc::debug_check_empty<snmalloc::Alloc::Config>(&is_ok);
+    Logging::cout() << "leak check done. is_ok=" << is_ok << std::endl;
     return !is_ok;
   }
 
   bool schedular_has_leaks()
   {
+    verona::rt::LocalEpochPool::sort();
+
     bool has_leaks = get_has_leaks();
 
     if (has_leaks)
@@ -72,6 +76,11 @@ extern "C"
       if (!get_has_leaks())
       {
         std::cout << "??? leaks disapeared by magic???" << std::endl;
+
+#ifdef USE_FLIGHT_RECORDER
+        Logging::SysLog::dump_flight_recorder();
+#endif
+
         abort();
       }
     }

@@ -1,5 +1,11 @@
 // TODO: Richer logging abstractions.
 
+pub fn log_snmalloc(v: &str) {
+    unsafe {
+        verona_rt_sys::boxcars_snmalloc_message(v.as_ptr(), v.len());
+    }
+}
+
 pub fn log(val: &'static core::ffi::CStr) {
     // TODO: Does this race?
     unsafe {

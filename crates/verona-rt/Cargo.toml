@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 verona-rt-sys = { version = "=0.0.2", path = "../verona-rt-sys" }
-cstr = "0.2.11" # TODO: Remove
 
 [features]
 systematic_testing = ["verona-rt-sys/systematic_testing"]
@@ -20,6 +19,3 @@ sanitizer_thread  = ["__any_sanitizer", "verona-rt-sys/sanitizer_thread"]
 
 # Only for cfg's
 __any_sanitizer = []
-
-[dev-dependencies]
-libc = "0.2.153"

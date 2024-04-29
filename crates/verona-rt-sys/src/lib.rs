@@ -111,6 +111,8 @@ extern "C" {
     pub fn boxcar_log_usize(n: usize);
     pub fn boxcar_log_ptr(p: *const ());
     pub fn boxcar_log_endl();
+    // TODO: Should this be c_char?
+    pub fn boxcars_snmalloc_message(ptr: *const u8, len: usize);
 }
 
 #[test]

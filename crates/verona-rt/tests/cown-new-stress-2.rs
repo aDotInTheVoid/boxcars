@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use verona_rt::log_snmalloc;
 use verona_rt::{with_leak_detector, CownPtr};
 
 const TIME_TO_RUN: Duration = Duration::from_secs(10);
@@ -16,38 +17,37 @@ fn main() {
     }
 }
 
-fn stderr_log(c: &core::ffi::CStr) {
-    // For some reasons rustc logging is borked here, so yolo to syscalls.
-
-    unsafe {
-        libc::write(libc::STDERR_FILENO, c.as_ptr() as _, c.to_bytes().len());
-    }
-}
-
 fn one_run() {
     with_leak_detector(|| {
-        stderr_log(c"begin main\n");
+        log_snmalloc("!! begin main");
 
         thread::scope(|s| {
             for _ in 0..10 {
                 create_sched_noise(s);
 
                 s.spawn(|| {
-                    let mut v = Vec::new();
+                    log_snmalloc("!! begin manipulation");
+                    {
+                        let mut v = Vec::new();
 
-                    for i in 0..100 {
-                        v.push(CownPtr::new(i));
+                        for i in 0..100 {
+                            v.push(CownPtr::new(i));
+                        }
+
+                        let mut vs = Vec::new();
+
+                        for _ in 0..100 {
+                            vs.push(v.clone());
+                        }
+                        log_snmalloc("!! running dtors");
                     }
-
-                    let mut vs = Vec::new();
-
-                    for _ in 0..100 {
-                        vs.push(v.clone());
-                    }
+                    log_snmalloc("!! done manipulation");
                 });
             }
+
+            log_snmalloc("!! scope over, awaiting  join");
         });
-        stderr_log(c"Finishing main block\n");
+        log_snmalloc("!! all joined, end main");
     })
 }
 

@@ -16,8 +16,18 @@ fn main() {
     }
 }
 
+fn stderr_log(c: &core::ffi::CStr) {
+    // For some reasons rustc logging is borked here, so yolo to syscalls.
+
+    unsafe {
+        libc::write(libc::STDERR_FILENO, c.as_ptr() as _, c.to_bytes().len());
+    }
+}
+
 fn one_run() {
     with_leak_detector(|| {
+        stderr_log(c"begin main\n");
+
         thread::scope(|s| {
             for _ in 0..10 {
                 create_sched_noise(s);
@@ -36,7 +46,8 @@ fn one_run() {
                     }
                 });
             }
-        })
+        });
+        stderr_log(c"Finishing main block\n");
     })
 }
 

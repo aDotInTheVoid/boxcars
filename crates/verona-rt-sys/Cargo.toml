@@ -19,4 +19,9 @@ cmake = "0.1.50"
 systematic_testing = []
 flight_recorder = []
 snmalloc_tracing = []
-asan = []
+
+sanitizer_address = ["__any_sanitizer"]
+sanitizer_thread = ["__any_sanitizer"]
+
+# Only for cfg attrs.
+__any_sanitizer = []

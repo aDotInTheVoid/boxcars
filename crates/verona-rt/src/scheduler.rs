@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn run_from_multi_threads() {
-        std::thread::scope(|s| {
+        stdx::thread::scope(|s| {
             for _ in 0..10 {
                 s.spawn(|| {
                     for _ in 0..100 {
@@ -94,7 +94,7 @@ mod tests {
     #[test]
     #[ignore = "https://github.com/aDotInTheVoid/boxcars/issues/4"]
     fn panic_safe() {
-        std::thread::scope(|s| {
+        stdx::thread::scope(|s| {
             for _ in 0..10 {
                 s.spawn(|| {
                     for _ in 0..10 {

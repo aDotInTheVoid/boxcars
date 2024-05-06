@@ -6,7 +6,10 @@ use verona_rt_sys::{
 };
 
 #[test]
-#[cfg_attr(feature = "asan", ignore = "leak detector doesn't work under ASAN")]
+#[cfg_attr(
+    feature = "__any_sanitizer",
+    ignore = "leak detector doesn't work under ASAN"
+)]
 fn main() {
     unsafe {
         enable_logging();

@@ -8,7 +8,10 @@ use std::mem;
 
 #[test]
 #[should_panic = "leaks detected"]
-#[cfg_attr(feature = "asan", ignore = "leak detector doesn't work under ASAN")]
+#[cfg_attr(
+    feature = "__any_sanitizer",
+    ignore = "leak detector doesn't work under ASAN"
+)]
 fn leak_detector_works() {
     with_leak_detector(|| {
         let v = CownPtr::new(666);

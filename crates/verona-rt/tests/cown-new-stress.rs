@@ -1,11 +1,9 @@
-use std::thread;
-
-use verona_rt::{with_scheduler, CownPtr};
+use verona_rt::{with_leak_detector, CownPtr};
 
 #[test]
 fn main() {
-    with_scheduler(|| {
-        thread::scope(|s| {
+    with_leak_detector(|| {
+        stdx::thread::scope(|s| {
             for _ in 0..10 {
                 s.spawn(|| {
                     let mut v = Vec::new();

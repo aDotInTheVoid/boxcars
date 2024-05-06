@@ -4,6 +4,7 @@
 #include <ostream>
 #include <stddef.h>
 #include <stdint.h>
+#include <string_view>
 // verona
 #include <cpp/lambdabehaviour.h>
 #include <object/object.h>
@@ -47,12 +48,58 @@ extern "C"
   {
     Scheduler::set_detect_leaks(detect_leaks);
   }
-  bool schedular_has_leaks()
+
+  static bool get_has_leaks()
   {
     bool is_ok = true;
+#ifdef SNMALLOC_TRACING
+    snmalloc::message<1024>("!! checking for leaks");
+#endif
+
     snmalloc::debug_check_empty<snmalloc::Alloc::Config>(&is_ok);
-    // snmalloc::debug_check_empty<snmalloc::Alloc::Config>();
+#ifdef SNMALLOC_TRACING
+    snmalloc::message<1024>("!! leak check done, is_ok={}", is_ok);
+#endif
+
     return !is_ok;
+  }
+
+  bool schedular_has_leaks()
+  {
+    verona::rt::LocalEpochPool::sort();
+
+    bool has_leaks = get_has_leaks();
+
+    if (has_leaks)
+    {
+#ifdef SNMALLOC_TRACING
+      snmalloc::message<1024>("!! Leaks detected, trying double jeopardy");
+#endif
+
+      // Double Jeopardy: See if we still have leaks after waiting
+      // a short while for more destructors/gc to run on other threads.
+      //
+      // This is terrible practice to use sleep for sync, but in this case we've
+      // already goofed, and it's usefull to know if the leaks are due to some
+      // race condition here. Origionally added for #21, we'll see if it
+      // remains.
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      if (!get_has_leaks())
+      {
+#ifdef SNMALLOC_TRACING
+        snmalloc::message<1024>("!! Double jeopardy found leaks disapearing??");
+#endif
+        std::cerr << "??? leaks disapeared by magic???" << std::endl;
+
+#ifdef USE_FLIGHT_RECORDER
+        Logging::SysLog::dump_flight_recorder();
+#endif
+
+        abort();
+      }
+    }
+
+    return has_leaks;
   }
 
   /*
@@ -148,5 +195,11 @@ extern "C"
   {
     *size = sizeof(Cown);
     *align = alignof(Cown);
+  }
+
+  void boxcars_snmalloc_message(const char* ptr, size_t len)
+  {
+    std::string_view s(ptr, len);
+    snmalloc::message<1024>("{}", s);
   }
 }

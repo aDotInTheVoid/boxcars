@@ -4,23 +4,23 @@
 //! let string = CownPtr::new(String::new());
 //! let vec = CownPtr::new(Vec::<i32>::new());
 //!
-//! when1(&string, |mut s| {
+//! when(&string, |mut s| {
 //!     assert_eq!(&*s, "");
 //!     s.push_str("foo");
 //! });
-//! when1(&vec, |mut v| {
+//! when(&vec, |mut v| {
 //!     assert_eq!(&*v, &[]);
 //!     v.push(101);
 //! });
-//! when2(&string, &vec, |mut s, mut v| {
+//! when((&string, &vec), |mut s, mut v| {
 //!     assert_eq!(&*s, "foo");
 //!     assert_eq!(&*v, &[101]);
 //!     s.push_str("bar");
 //!     v.push(666);
 //! });
 //!
-//! when1(&string, |s| assert_eq!(&*s, "foobar"));
-//! when1(&vec, |v| assert_eq!(&*v, &[101, 666]));
+//! when(&string, |s| assert_eq!(&*s, "foobar"));
+//! when(&vec, |v| assert_eq!(&*v, &[101, 666]));
 //! # });
 //! ```
 //!
@@ -60,10 +60,12 @@ mod cown;
 mod descriptor;
 mod log;
 mod scheduler;
+mod variadic_when;
 mod when;
 
 pub use cown::CownPtr;
 pub use log::{log, log_snmalloc};
 pub use scheduler::{with as with_scheduler, with_leak_detector};
+pub use variadic_when::{when, CownCollection};
 pub use when::AcquiredCown;
 pub use when::{when1, when2, when3, when4, when5, when6, when7, when8, when9};

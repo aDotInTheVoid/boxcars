@@ -20,9 +20,39 @@ using verona::rt::Scheduler;
 static_assert(sizeof(void*) == sizeof(size_t));
 static_assert(sizeof(void*) == sizeof(ptrdiff_t));
 
-typedef void (*WhenNFunc)(size_t, Cown**, void*);
+typedef void (*WhenNFunc)(Cown**, size_t, void*);
 typedef void (*When1Func)(Cown*, void*);
 typedef void (*When2Func)(Cown*, Cown*, void*);
+
+template<size_t N_COWNS>
+struct CownThunk
+{
+  std::array<Cown*, N_COWNS> cowns_;
+  WhenNFunc thunk_;
+  void* data_;
+
+  void operator()()
+  {
+    thunk_(cowns_.data(), N_COWNS, data_);
+  }
+};
+
+template<size_t N_COWNS>
+static std::array<Cown*, N_COWNS> gather_cown(size_t len, Cown** ptr)
+{
+  assert(len == N_COWNS);
+  std::array<Cown*, N_COWNS> arr;
+  memcpy(arr.data(), ptr, sizeof(arr));
+  return arr;
+}
+
+template<size_t N_COWNS>
+static void schedule_n(size_t len, Cown** ptr, WhenNFunc func, void* data)
+{
+  auto cownarr = gather_cown<N_COWNS>(len, ptr);
+  auto lambda = CownThunk<N_COWNS>{cownarr, func, data};
+  verona::rt::schedule_lambda(len, ptr, std::move(lambda));
+}
 
 extern "C"
 {
@@ -184,6 +214,23 @@ extern "C"
     Cown* cowns[2] = {c1, c2};
     verona::rt::schedule_lambda(2, cowns, [=]() { func(c1, c2, data); });
   }
+
+#define BUILD_SCHEDULE(n) \
+  void boxcars_sched_##n(size_t len, Cown** ptr, WhenNFunc func, void* data) \
+  { \
+    schedule_n<n>(len, ptr, func, data); \
+  }
+
+  BUILD_SCHEDULE(1)
+  BUILD_SCHEDULE(2)
+  BUILD_SCHEDULE(3)
+  BUILD_SCHEDULE(4)
+  BUILD_SCHEDULE(5)
+  BUILD_SCHEDULE(6)
+  BUILD_SCHEDULE(7)
+  BUILD_SCHEDULE(8)
+  BUILD_SCHEDULE(9)
+  BUILD_SCHEDULE(10)
 
   void boxcars_test_descriptor_info(size_t* size, size_t* align)
   {

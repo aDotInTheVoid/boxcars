@@ -55,7 +55,8 @@ pub struct OpaqueCown {
     _marker: core::mem::MaybeUninit<[*const (); 3]>,
 }
 
-pub type Dtor = extern "C" fn(*mut ());
+// typedef void (*WhenNFunc)(size_t, Cown**, void*);
+pub type WhenNFunc = extern "C" fn(usize, *mut CownPtr, *mut ());
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
@@ -96,16 +97,20 @@ extern "C" {
 
     pub fn boxcars_allocate_cown(descriptor: &'static Descriptor) -> CownPtr;
 
-    pub fn boxcars_schedule_1(cown: CownPtr, func: extern "C" fn(CownPtr, *mut ()), data: *mut ());
-    pub fn boxcars_schedule_2(
-        c1: CownPtr,
-        c2: CownPtr,
-        func: extern "C" fn(CownPtr, CownPtr, *mut ()),
-        data: *mut (),
-    );
-
     pub fn enable_logging();
     pub fn dump_flight_recorder();
+
+    // boxcars_sched_##n(size_t len, Cown** ptr, WhenNFunc func, void* data)
+
+    pub fn boxcars_sched_1(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_2(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_3(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_4(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_5(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_6(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_7(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_8(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_9(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
 
     pub fn boxcar_log_cstr(ptr: *const core::ffi::c_char);
     pub fn boxcar_log_usize(n: usize);

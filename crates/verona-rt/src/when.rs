@@ -1,4 +1,4 @@
-use core::{fmt, marker::PhantomData, mem, ops};
+use core::{fmt, marker::PhantomData, mem, ops, slice};
 use std::ops::Deref;
 
 use verona_rt_sys as ffi;
@@ -50,16 +50,24 @@ unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
     }
 }
 
-extern "C" fn trampoline1<T>(aq: ffi::CownPtr, data: *mut ()) {
+extern "C" fn trampoline1<T>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
     unsafe {
-        let func = mem::transmute::<_, UseFunc1<T>>(data);
-        func(make_aq(aq));
+        let s = slice::from_raw_parts(cowns, len);
+        debug_assert_eq!(s.len(), 1);
+        let func: UseFunc1<T> = mem::transmute(data);
+        // TODO: Don't bounds check here.
+        func(make_aq(s[0]));
     }
 }
-extern "C" fn trampoline2<T, U>(a1: ffi::CownPtr, a2: ffi::CownPtr, data: *mut ()) {
+
+// (size_t, Cown**, void*)
+extern "C" fn trampoline2<T, U>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
     unsafe {
+        let s = slice::from_raw_parts(cowns, len);
+        debug_assert_eq!(s.len(), 2);
         let func: UseFunc2<T, U> = mem::transmute(data);
-        func(make_aq(a1), make_aq(a2));
+        // TODO: Don't bounds check here.
+        func(make_aq(s[0]), make_aq(s[1]));
     }
 }
 
@@ -69,11 +77,9 @@ type UseFunc2<T, U> = for<'a, 'b> fn(AcquiredCown<'a, T>, AcquiredCown<'b, U>);
 pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
     let trampoline = trampoline1::<T>;
 
-    unsafe { ffi::boxcars_schedule_1(cown.cown_ptr, trampoline, f as *mut ()) }
+    let mut cs = [cown.cown_ptr];
 
-    // unsafe {
-    //     ffi::boxcar_when1(&cown.cown_ptr, trampoline, f as _);
-    // }
+    unsafe { ffi::boxcars_sched_1(cs.len(), cs.as_mut_ptr(), trampoline, f as *mut ()) }
 }
 
 pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
@@ -86,8 +92,9 @@ pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
     );
 
     let trampoline = trampoline2::<T, U>;
+    let mut cs = [c1.cown_ptr, c2.cown_ptr];
     unsafe {
-        ffi::boxcars_schedule_2(c1.cown_ptr, c2.cown_ptr, trampoline, f as _);
+        ffi::boxcars_sched_2(cs.len(), cs.as_mut_ptr(), trampoline, f as _);
     }
 }
 

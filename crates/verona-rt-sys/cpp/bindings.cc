@@ -247,6 +247,8 @@ extern "C"
   void boxcars_snmalloc_message(const char* ptr, size_t len)
   {
     std::string_view s(ptr, len);
+#ifdef SNMALLOC_TRACING
     snmalloc::message<1024>("{}", s);
+#endif
   }
 }

@@ -93,9 +93,15 @@ pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicU8, Ordering};
+    use std::{
+        sync::{
+            atomic::{AtomicU8, Ordering},
+            Arc, Barrier, Mutex,
+        },
+        thread,
+    };
 
-    use crate::scheduler;
+    use crate::{scheduler, with_leak_detector};
 
     use super::*;
 
@@ -122,6 +128,25 @@ mod tests {
         });
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn when2_runs() {
+        static RUN_COUNTER: AtomicU8 = AtomicU8::new(0);
+
+        assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
+
+        scheduler::with(|| {
+            let v1 = CownPtr::new(1);
+            let v2 = CownPtr::new(2);
+            when2(&v1, &v2, |a1, a2| {
+                assert_eq!(*a1, 1);
+                assert_eq!(*a2, 2);
+                RUN_COUNTER.fetch_add(1, Ordering::SeqCst);
+            })
+        });
+
+        assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -205,5 +230,115 @@ mod tests {
                 assert_eq!(format!("{x:?}"), r#""101""#);
             })
         })
+    }
+
+    struct SetOnDrop(Arc<Mutex<bool>>);
+    impl std::ops::Drop for SetOnDrop {
+        fn drop(&mut self) {
+            if std::thread::panicking() {
+                return;
+            }
+
+            let mut is_droped = self.0.lock().unwrap();
+            assert_eq!(*is_droped, false);
+            *is_droped = true;
+        }
+    }
+    impl SetOnDrop {
+        fn new() -> (Self, Arc<Mutex<bool>>) {
+            let state: Arc<Mutex<bool>> = Arc::default();
+            (Self(state.clone()), state)
+        }
+    }
+
+    #[test]
+    fn when_retains_cowns() {
+        let bars = Arc::new((Barrier::new(2), Barrier::new(2), Barrier::new(2)));
+        let (droptrack, dropstate) = SetOnDrop::new();
+        let bars_ = Arc::clone(&bars);
+
+        let in_sched = move || {
+            let c_main = CownPtr::new(droptrack);
+
+            let c_bars = CownPtr::new(bars_);
+
+            // t0
+            when2(&c_main, &c_bars, |_, bars| {
+                bars.0.wait();
+            });
+            // t1
+            when2(&c_main, &c_bars, |_, bars| {
+                bars.1.wait();
+            });
+            // t2
+            when(&c_bars, |bars| {
+                bars.2.wait();
+            });
+        };
+
+        let jh = thread::spawn(|| with_leak_detector(in_sched));
+
+        bars.0.wait();
+        // t0 may be done, but may not be, but t1 still hold a reference.
+        assert_eq!(*dropstate.lock().unwrap(), false);
+        bars.1.wait();
+        // At some point here, we start running dtor for droptrack.
+        bars.2.wait();
+        // but it's definatly done here, as we've run t2, which must be after t1, as they
+        // both aquire c_bars.
+        assert_eq!(*dropstate.lock().unwrap(), true);
+
+        jh.join().unwrap();
+    }
+
+    #[test]
+    fn when_retains_cown_two() {
+        let (droptrack, dropstate) = SetOnDrop::new();
+        let bars = Arc::new((
+            Barrier::new(2),
+            Barrier::new(2),
+            Barrier::new(2),
+            Barrier::new(2),
+        ));
+        let bars_ = Arc::clone(&bars);
+        let is_droped = move || *dropstate.lock().unwrap();
+
+        let in_sched = || {
+            let c_main = CownPtr::new(droptrack);
+
+            let c_bars = CownPtr::new(bars_);
+
+            // t0
+            when2(&c_main, &c_bars, |m, bars| {
+                assert_eq!(*m.0.lock().unwrap(), false);
+                bars.0.wait();
+            });
+            // t1
+            when(&c_bars, |bars| {
+                bars.1.wait();
+            });
+            // t2
+            when2(&c_main, &c_bars, |m, bars| {
+                assert_eq!(*m.0.lock().unwrap(), false);
+                bars.2.wait();
+            });
+            // t3
+            when(&c_bars, |bars| {
+                bars.3.wait();
+            });
+        };
+        let jh = thread::spawn(|| scheduler::with_leak_detector(in_sched));
+
+        assert_eq!(is_droped(), false);
+        bars.0.wait();
+        assert_eq!(is_droped(), false);
+        bars.1.wait();
+        assert_eq!(is_droped(), false);
+        bars.2.wait();
+        // t2 is over here, but we've not started t3, so unknown if drop has run
+        bars.3.wait();
+        assert_eq!(is_droped(), true, "cown should still be alive here");
+
+        jh.join().unwrap();
     }
 }

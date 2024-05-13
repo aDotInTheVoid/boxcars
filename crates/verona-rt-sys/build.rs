@@ -24,7 +24,7 @@ fn main() {
         match flag {
             "-Zsanitizer=thread" => z_sanitizer_thread = true,
             "-Zsanitizer=address" => z_sanitizer_address = true,
-            "" => {}
+            "" | "-Zmacro-backtrace" => {}
             other => panic!("unknown flag {other:?}"),
         }
     }

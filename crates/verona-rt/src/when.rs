@@ -50,52 +50,52 @@ unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
     }
 }
 
-extern "C" fn trampoline1<T>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
-    unsafe {
-        let s = slice::from_raw_parts(cowns, len);
-        debug_assert_eq!(s.len(), 1);
-        let func: UseFunc1<T> = mem::transmute(data);
-        // TODO: Don't bounds check here.
-        func(make_aq(s[0]));
-    }
+macro_rules! one_trampoline {
+    (
+        $whenfunc:ident
+        $ffiname:ident
+        $usefunc:ident
+        $tramp_name:ident
+        <
+        $($gty:ident $glife:lifetime $cname:ident $idx:literal),+
+        >
+    ) => {
+        type $usefunc<$($gty),+> = for <$($glife),+> fn($(AcquiredCown<$glife, $gty>),+);
+
+
+        extern "C" fn $tramp_name<$($gty),+>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
+            unsafe {
+                let s = slice::from_raw_parts(cowns, len);
+                let func: $usefunc<$($gty),+> = mem::transmute(data);
+                func($(make_aq(s[$idx])),+)
+            }
+        }
+
+        pub fn $whenfunc<$($gty),+>($($cname: &CownPtr<$gty>),+, f: $usefunc<$($gty),+>) {
+            let trampoline = $tramp_name::<$($gty),+>;
+            let mut cs = [$($cname.cown_ptr),+];
+            assert!(is_unique(&cs), "Cowns not unique");
+            unsafe {
+                ffi::$ffiname(cs.len(), cs.as_mut_ptr(), trampoline, f as _);
+            }
+
+        }
+    };
 }
 
-// (size_t, Cown**, void*)
-extern "C" fn trampoline2<T, U>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
-    unsafe {
-        let s = slice::from_raw_parts(cowns, len);
-        debug_assert_eq!(s.len(), 2);
-        let func: UseFunc2<T, U> = mem::transmute(data);
-        // TODO: Don't bounds check here.
-        func(make_aq(s[0]), make_aq(s[1]));
-    }
-}
+one_trampoline!(when boxcars_sched_1 Func1 t1 <A 'a cown 0>);
+one_trampoline!(when2 boxcars_sched_2 Func2 t2 <A 'a cown1 0, B 'b cown2 1>);
 
-type UseFunc1<T> = for<'a> fn(AcquiredCown<'a, T>);
-type UseFunc2<T, U> = for<'a, 'b> fn(AcquiredCown<'a, T>, AcquiredCown<'b, U>);
+// one_trampoline!(when  UseFunc1 trampoline1 < A 'a                   > 0);
+// one_trampoline!(when2 UseFunc2 trampoline2 < A 'a, B 'b             > 0, 1);
+// one_trampoline!(when3 UseFunc3 trampoline3 < A 'a, B 'b, C 'c       > 0, 1, 2);
+// one_trampoline!(when4 UseFunc4 trampoline4 < A 'a, B 'b, C 'c, D 'd > 0, 1, 2, 3);
 
-pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
-    let trampoline = trampoline1::<T>;
-
-    let mut cs = [cown.cown_ptr];
-
-    unsafe { ffi::boxcars_sched_1(cs.len(), cs.as_mut_ptr(), trampoline, f as *mut ()) }
-}
-
-pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
-    // So we don't let the func acquire the same cown twice.
-    // See also: https://github.com/microsoft/verona-rt/pull/30
-    assert_ne!(
-        c1.cown_ptr.addr(),
-        c2.cown_ptr.addr(),
-        "used the same cown twice"
-    );
-
-    let trampoline = trampoline2::<T, U>;
-    let mut cs = [c1.cown_ptr, c2.cown_ptr];
-    unsafe {
-        ffi::boxcars_sched_2(cs.len(), cs.as_mut_ptr(), trampoline, f as _);
-    }
+// FIXME: LLVM eat's shit on this codegen. https://godbolt.org/z/s9sqGqGbP
+fn is_unique<const N: usize>(cown: &[ffi::CownPtr; N]) -> bool {
+    let mut addrs = cown.map(|c| c.addr());
+    addrs.sort_unstable();
+    !addrs.windows(2).any(|w| w[0] == w[1])
 }
 
 #[cfg(test)]

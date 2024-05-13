@@ -50,7 +50,7 @@ unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
     }
 }
 
-macro_rules! one_trampoline {
+macro_rules! one_when {
     (
         $whenfunc:ident
         $ffiname:ident
@@ -83,13 +83,20 @@ macro_rules! one_trampoline {
     };
 }
 
-one_trampoline!(when boxcars_sched_1 Func1 t1 <A 'a cown 0>);
-one_trampoline!(when2 boxcars_sched_2 Func2 t2 <A 'a cown1 0, B 'b cown2 1>);
+// TODO: Add when0
+// one_when!(when0 boxcars_sched_0 Func0 t0 <>);
 
-// one_trampoline!(when  UseFunc1 trampoline1 < A 'a                   > 0);
-// one_trampoline!(when2 UseFunc2 trampoline2 < A 'a, B 'b             > 0, 1);
-// one_trampoline!(when3 UseFunc3 trampoline3 < A 'a, B 'b, C 'c       > 0, 1, 2);
-// one_trampoline!(when4 UseFunc4 trampoline4 < A 'a, B 'b, C 'c, D 'd > 0, 1, 2, 3);
+// TODO: Don't special case when1 name.
+one_when!(when boxcars_sched_1 Func1 t1 <A 'a cown0 0>);
+
+one_when!(when2 boxcars_sched_2 Func2 t2 <A 'a cown0 0, B 'b cown1 1>);
+one_when!(when3 boxcars_sched_3 Func3 t3 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2>);
+one_when!(when4 boxcars_sched_4 Func4 t4 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3>);
+one_when!(when5 boxcars_sched_5 Func5 t5 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4>);
+one_when!(when6 boxcars_sched_6 Func6 t6 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5>);
+one_when!(when7 boxcars_sched_7 Func7 t7 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6>);
+one_when!(when8 boxcars_sched_8 Func8 t8 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7>);
+one_when!(when9 boxcars_sched_9 Func9 t9 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7, I 'i cown8 8>);
 
 // FIXME: LLVM eat's shit on this codegen. https://godbolt.org/z/s9sqGqGbP
 fn is_unique<const N: usize>(cown: &[ffi::CownPtr; N]) -> bool {

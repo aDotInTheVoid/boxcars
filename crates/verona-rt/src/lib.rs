@@ -65,4 +65,5 @@ mod when;
 pub use cown::CownPtr;
 pub use log::{log, log_snmalloc};
 pub use scheduler::{with as with_scheduler, with_leak_detector};
-pub use when::{when, when2, AcquiredCown};
+pub use when::AcquiredCown;
+pub use when::{when, when2, when3, when4, when5, when6, when7, when8, when9};

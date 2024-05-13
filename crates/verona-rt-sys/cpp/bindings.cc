@@ -20,9 +20,7 @@ using verona::rt::Scheduler;
 static_assert(sizeof(void*) == sizeof(size_t));
 static_assert(sizeof(void*) == sizeof(ptrdiff_t));
 
-typedef void (*WhenNFunc)(Cown**, size_t, void*);
-typedef void (*When1Func)(Cown*, void*);
-typedef void (*When2Func)(Cown*, Cown*, void*);
+typedef void (*WhenNFunc)(size_t, Cown**, void*);
 
 template<size_t N_COWNS>
 struct CownThunk
@@ -33,7 +31,8 @@ struct CownThunk
 
   void operator()()
   {
-    thunk_(cowns_.data(), N_COWNS, data_);
+    // TODO: remove size param.
+    thunk_(N_COWNS, cowns_.data(), data_);
   }
 };
 
@@ -46,12 +45,14 @@ static std::array<Cown*, N_COWNS> gather_cown(size_t len, Cown** ptr)
   return arr;
 }
 
+// TODO: Expose variadic API.
 template<size_t N_COWNS>
 static void schedule_n(size_t len, Cown** ptr, WhenNFunc func, void* data)
 {
+  assert(len == N_COWNS);
   auto cownarr = gather_cown<N_COWNS>(len, ptr);
   auto lambda = CownThunk<N_COWNS>{cownarr, func, data};
-  verona::rt::schedule_lambda(len, ptr, std::move(lambda));
+  verona::rt::schedule_lambda(N_COWNS, ptr, std::move(lambda));
 }
 
 extern "C"
@@ -205,19 +206,11 @@ extern "C"
 
   // TODO: Use requests
   // TODO: Variadic.
-  void boxcars_schedule_1(Cown* cown, When1Func func, void* data)
-  {
-    verona::rt::schedule_lambda(cown, [=]() { func(cown, data); });
-  }
-  void boxcars_schedule_2(Cown* c1, Cown* c2, When2Func func, void* data)
-  {
-    Cown* cowns[2] = {c1, c2};
-    verona::rt::schedule_lambda(2, cowns, [=]() { func(c1, c2, data); });
-  }
 
 #define BUILD_SCHEDULE(n) \
   void boxcars_sched_##n(size_t len, Cown** ptr, WhenNFunc func, void* data) \
   { \
+    assert(len == n); \
     schedule_n<n>(len, ptr, func, data); \
   }
 
@@ -230,7 +223,6 @@ extern "C"
   BUILD_SCHEDULE(7)
   BUILD_SCHEDULE(8)
   BUILD_SCHEDULE(9)
-  BUILD_SCHEDULE(10)
 
   void boxcars_test_descriptor_info(size_t* size, size_t* align)
   {

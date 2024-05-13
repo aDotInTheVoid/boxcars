@@ -1,4 +1,4 @@
-use core::{fmt, marker::PhantomData, mem, ops};
+use core::{fmt, marker::PhantomData, mem, ops, slice};
 use std::ops::Deref;
 
 use verona_rt_sys as ffi;
@@ -50,45 +50,59 @@ unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
     }
 }
 
-extern "C" fn trampoline1<T>(aq: ffi::CownPtr, data: *mut ()) {
-    unsafe {
-        let func = mem::transmute::<_, UseFunc1<T>>(data);
-        func(make_aq(aq));
-    }
+macro_rules! one_when {
+    (
+        $whenfunc:ident
+        $ffiname:ident
+        $usefunc:ident
+        $tramp_name:ident
+        <
+        $($gty:ident $glife:lifetime $cname:ident $idx:literal),+
+        >
+    ) => {
+        type $usefunc<$($gty),+> = for <$($glife),+> fn($(AcquiredCown<$glife, $gty>),+);
+
+
+        extern "C" fn $tramp_name<$($gty),+>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
+            unsafe {
+                let s = slice::from_raw_parts(cowns, len);
+                let func: $usefunc<$($gty),+> = mem::transmute(data);
+                func($(make_aq(s[$idx])),+)
+            }
+        }
+
+        pub fn $whenfunc<$($gty),+>($($cname: &CownPtr<$gty>),+, f: $usefunc<$($gty),+>) {
+            let trampoline = $tramp_name::<$($gty),+>;
+            let mut cs = [$($cname.cown_ptr),+];
+            assert!(is_unique(&cs), "Cowns not unique");
+            unsafe {
+                ffi::$ffiname(cs.len(), cs.as_mut_ptr(), trampoline, f as _);
+            }
+
+        }
+    };
 }
-extern "C" fn trampoline2<T, U>(a1: ffi::CownPtr, a2: ffi::CownPtr, data: *mut ()) {
-    unsafe {
-        let func: UseFunc2<T, U> = mem::transmute(data);
-        func(make_aq(a1), make_aq(a2));
-    }
-}
 
-type UseFunc1<T> = for<'a> fn(AcquiredCown<'a, T>);
-type UseFunc2<T, U> = for<'a, 'b> fn(AcquiredCown<'a, T>, AcquiredCown<'b, U>);
+// TODO: Add when0
+// one_when!(when0 boxcars_sched_0 Func0 t0 <>);
 
-pub fn when<T>(cown: &CownPtr<T>, f: UseFunc1<T>) {
-    let trampoline = trampoline1::<T>;
+// TODO: Don't special case when1 name.
+one_when!(when boxcars_sched_1 Func1 t1 <A 'a cown0 0>);
 
-    unsafe { ffi::boxcars_schedule_1(cown.cown_ptr, trampoline, f as *mut ()) }
+one_when!(when2 boxcars_sched_2 Func2 t2 <A 'a cown0 0, B 'b cown1 1>);
+one_when!(when3 boxcars_sched_3 Func3 t3 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2>);
+one_when!(when4 boxcars_sched_4 Func4 t4 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3>);
+one_when!(when5 boxcars_sched_5 Func5 t5 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4>);
+one_when!(when6 boxcars_sched_6 Func6 t6 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5>);
+one_when!(when7 boxcars_sched_7 Func7 t7 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6>);
+one_when!(when8 boxcars_sched_8 Func8 t8 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7>);
+one_when!(when9 boxcars_sched_9 Func9 t9 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7, I 'i cown8 8>);
 
-    // unsafe {
-    //     ffi::boxcar_when1(&cown.cown_ptr, trampoline, f as _);
-    // }
-}
-
-pub fn when2<T, U>(c1: &CownPtr<T>, c2: &CownPtr<U>, f: UseFunc2<T, U>) {
-    // So we don't let the func acquire the same cown twice.
-    // See also: https://github.com/microsoft/verona-rt/pull/30
-    assert_ne!(
-        c1.cown_ptr.addr(),
-        c2.cown_ptr.addr(),
-        "used the same cown twice"
-    );
-
-    let trampoline = trampoline2::<T, U>;
-    unsafe {
-        ffi::boxcars_schedule_2(c1.cown_ptr, c2.cown_ptr, trampoline, f as _);
-    }
+// FIXME: LLVM eat's shit on this codegen. https://godbolt.org/z/s9sqGqGbP
+fn is_unique<const N: usize>(cown: &[ffi::CownPtr; N]) -> bool {
+    let mut addrs = cown.map(|c| c.addr());
+    addrs.sort_unstable();
+    !addrs.windows(2).any(|w| w[0] == w[1])
 }
 
 #[cfg(test)]
@@ -340,5 +354,116 @@ mod tests {
         assert_eq!(is_droped(), true, "cown should still be alive here");
 
         jh.join().unwrap();
+    }
+
+    #[test]
+    fn many_airety() {
+        with_leak_detector(|| {
+            let c0 = CownPtr::new(0);
+            let c1 = CownPtr::new(1);
+            let c2 = CownPtr::new(2);
+            let c3 = CownPtr::new(3);
+            let c4 = CownPtr::new(4);
+            let c5 = CownPtr::new(5);
+            let c6 = CownPtr::new(6);
+            let c7 = CownPtr::new(7);
+            let c8 = CownPtr::new(8);
+
+            when9(
+                &c0,
+                &c1,
+                &c2,
+                &c3,
+                &c4,
+                &c5,
+                &c6,
+                &c7,
+                &c8,
+                |mut a0, mut a1, mut a2, mut a3, mut a4, mut a5, mut a6, mut a7, mut a8| {
+                    assert_eq!(*a0, 0);
+                    *a0 *= 10;
+                    assert_eq!(*a1, 1);
+                    *a1 *= 10;
+                    assert_eq!(*a2, 2);
+                    *a2 *= 10;
+                    assert_eq!(*a3, 3);
+                    *a3 *= 10;
+                    assert_eq!(*a4, 4);
+                    *a4 *= 10;
+                    assert_eq!(*a5, 5);
+                    *a5 *= 10;
+                    assert_eq!(*a6, 6);
+                    *a6 *= 10;
+                    assert_eq!(*a7, 7);
+                    *a7 *= 10;
+                    assert_eq!(*a8, 8);
+                    *a8 *= 10;
+                },
+            );
+
+            when6(
+                &c0,
+                &c1,
+                &c2,
+                &c3,
+                &c4,
+                &c5,
+                |mut a0, mut a1, mut a2, mut a3, mut a4, mut a5| {
+                    assert_eq!(*a0, 0);
+                    *a0 *= 10;
+                    assert_eq!(*a1, 10);
+                    *a1 *= 10;
+                    assert_eq!(*a2, 20);
+                    *a2 *= 10;
+                    assert_eq!(*a3, 30);
+                    *a3 *= 10;
+                    assert_eq!(*a4, 40);
+                    *a4 *= 10;
+                    assert_eq!(*a5, 50);
+                    *a5 *= 10;
+                },
+            );
+
+            when3(&c0, &c1, &c2, |mut a0, mut a1, mut a2| {
+                assert_eq!(*a0, 0);
+                *a0 *= 10;
+                assert_eq!(*a1, 100);
+                *a1 *= 10;
+                assert_eq!(*a2, 200);
+                *a2 *= 10;
+            });
+
+            when9(
+                &c0,
+                &c1,
+                &c2,
+                &c3,
+                &c4,
+                &c5,
+                &c6,
+                &c7,
+                &c8,
+                |mut a0, mut a1, mut a2, mut a3, mut a4, mut a5, mut a6, mut a7, mut a8| {
+                    assert_eq!(*a0, 0);
+                    *a0 *= 10;
+                    assert_eq!(*a1, 1000);
+                    *a1 *= 10;
+                    assert_eq!(*a2, 2000);
+                    *a2 *= 10;
+                    assert_eq!(*a3, 300);
+                    *a3 *= 10;
+                    assert_eq!(*a4, 400);
+                    *a4 *= 10;
+                    assert_eq!(*a5, 500);
+                    *a5 *= 10;
+                    assert_eq!(*a6, 60);
+                    *a6 *= 10;
+                    assert_eq!(*a7, 70);
+                    *a7 *= 10;
+                    assert_eq!(*a8, 80);
+                    *a8 *= 10;
+                },
+            );
+        });
     }
 }

@@ -86,9 +86,7 @@ macro_rules! one_when {
 // TODO: Add when0
 // one_when!(when0 boxcars_sched_0 Func0 t0 <>);
 
-// TODO: Don't special case when1 name.
-one_when!(when boxcars_sched_1 Func1 t1 <A 'a cown0 0>);
-
+one_when!(when1 boxcars_sched_1 Func1 t1 <A 'a cown0 0>);
 one_when!(when2 boxcars_sched_2 Func2 t2 <A 'a cown0 0, B 'b cown1 1>);
 one_when!(when3 boxcars_sched_3 Func3 t3 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2>);
 one_when!(when4 boxcars_sched_4 Func4 t4 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3>);
@@ -130,12 +128,12 @@ mod tests {
 
         scheduler::with(|| {
             let v = CownPtr::new(101);
-            when(&v, |mut v| {
+            when1(&v, |mut v| {
                 assert_eq!(*v, 101);
                 *v += 1;
                 incr();
             });
-            when(&v, |v| {
+            when1(&v, |v| {
                 assert_eq!(*v, 102);
                 incr();
             });
@@ -175,20 +173,20 @@ mod tests {
         scheduler::with(|| {
             let vec_cown = CownPtr::new(vec![1, 2, 3]);
 
-            when(&vec_cown, |mut v| {
+            when1(&vec_cown, |mut v| {
                 assert_eq!(*v, &[1, 2, 3]);
                 v.push(4);
                 incr();
             });
 
-            when(&vec_cown, |mut v| {
+            when1(&vec_cown, |mut v| {
                 assert_eq!(*v, &[1, 2, 3, 4]);
                 assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 1);
                 assert_eq!(v.pop(), Some(4));
                 incr();
             });
 
-            when(&vec_cown, |v| {
+            when1(&vec_cown, |v| {
                 assert_eq!(*v, &[1, 2, 3]);
                 assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 2);
                 incr();
@@ -204,11 +202,11 @@ mod tests {
             let string = CownPtr::new(String::new());
             let vec = CownPtr::new(Vec::new());
 
-            when(&string, |mut s| {
+            when1(&string, |mut s| {
                 assert_eq!(&*s, "");
                 s.push_str("foo");
             });
-            when(&vec, |mut v| {
+            when1(&vec, |mut v| {
                 assert_eq!(&*v, &[]);
                 v.push(101);
             });
@@ -218,8 +216,8 @@ mod tests {
                 s.push_str("bar");
                 v.push(666);
             });
-            when(&string, |s| assert_eq!(&*s, "foobar"));
-            when(&vec, |v| assert_eq!(&*v, &[101, 666]));
+            when1(&string, |s| assert_eq!(&*s, "foobar"));
+            when1(&vec, |v| assert_eq!(&*v, &[101, 666]));
         })
     }
 
@@ -238,7 +236,7 @@ mod tests {
     fn fmt_acquired() {
         scheduler::with(|| {
             let x = CownPtr::new("101");
-            when(&x, |x| {
+            when1(&x, |x| {
                 assert_eq!(*x, "101");
                 assert_eq!(format!("{x}"), "101");
                 assert_eq!(format!("{x:?}"), r#""101""#);
@@ -285,7 +283,7 @@ mod tests {
                 bars.1.wait();
             });
             // t2
-            when(&c_bars, |bars| {
+            when1(&c_bars, |bars| {
                 bars.2.wait();
             });
         };
@@ -328,7 +326,7 @@ mod tests {
                 bars.0.wait();
             });
             // t1
-            when(&c_bars, |bars| {
+            when1(&c_bars, |bars| {
                 bars.1.wait();
             });
             // t2
@@ -337,7 +335,7 @@ mod tests {
                 bars.2.wait();
             });
             // t3
-            when(&c_bars, |bars| {
+            when1(&c_bars, |bars| {
                 bars.3.wait();
             });
         };

@@ -4,11 +4,11 @@
 //! let string = CownPtr::new(String::new());
 //! let vec = CownPtr::new(Vec::<i32>::new());
 //!
-//! when(&string, |mut s| {
+//! when1(&string, |mut s| {
 //!     assert_eq!(&*s, "");
 //!     s.push_str("foo");
 //! });
-//! when(&vec, |mut v| {
+//! when1(&vec, |mut v| {
 //!     assert_eq!(&*v, &[]);
 //!     v.push(101);
 //! });
@@ -19,8 +19,8 @@
 //!     v.push(666);
 //! });
 //!
-//! when(&string, |s| assert_eq!(&*s, "foobar"));
-//! when(&vec, |v| assert_eq!(&*v, &[101, 666]));
+//! when1(&string, |s| assert_eq!(&*s, "foobar"));
+//! when1(&vec, |v| assert_eq!(&*v, &[101, 666]));
 //! # });
 //! ```
 //!
@@ -66,4 +66,4 @@ pub use cown::CownPtr;
 pub use log::{log, log_snmalloc};
 pub use scheduler::{with as with_scheduler, with_leak_detector};
 pub use when::AcquiredCown;
-pub use when::{when, when2, when3, when4, when5, when6, when7, when8, when9};
+pub use when::{when1, when2, when3, when4, when5, when6, when7, when8, when9};

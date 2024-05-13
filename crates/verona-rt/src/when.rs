@@ -60,7 +60,7 @@ macro_rules! one_when {
         $($gty:ident $glife:lifetime $cname:ident $idx:literal),+
         >
     ) => {
-        type $usefunc<$($gty),+> = for <$($glife),+> fn($(AcquiredCown<$glife, $gty>),+);
+        pub(crate) type $usefunc<$($gty),+> = for <$($glife),+> fn($(AcquiredCown<$glife, $gty>),+);
 
 
         extern "C" fn $tramp_name<$($gty),+>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {

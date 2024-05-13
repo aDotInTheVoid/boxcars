@@ -355,4 +355,115 @@ mod tests {
 
         jh.join().unwrap();
     }
+
+    #[test]
+    fn many_airety() {
+        with_leak_detector(|| {
+            let c0 = CownPtr::new(0);
+            let c1 = CownPtr::new(1);
+            let c2 = CownPtr::new(2);
+            let c3 = CownPtr::new(3);
+            let c4 = CownPtr::new(4);
+            let c5 = CownPtr::new(5);
+            let c6 = CownPtr::new(6);
+            let c7 = CownPtr::new(7);
+            let c8 = CownPtr::new(8);
+
+            when9(
+                &c0,
+                &c1,
+                &c2,
+                &c3,
+                &c4,
+                &c5,
+                &c6,
+                &c7,
+                &c8,
+                |mut a0, mut a1, mut a2, mut a3, mut a4, mut a5, mut a6, mut a7, mut a8| {
+                    assert_eq!(*a0, 0);
+                    *a0 *= 10;
+                    assert_eq!(*a1, 1);
+                    *a1 *= 10;
+                    assert_eq!(*a2, 2);
+                    *a2 *= 10;
+                    assert_eq!(*a3, 3);
+                    *a3 *= 10;
+                    assert_eq!(*a4, 4);
+                    *a4 *= 10;
+                    assert_eq!(*a5, 5);
+                    *a5 *= 10;
+                    assert_eq!(*a6, 6);
+                    *a6 *= 10;
+                    assert_eq!(*a7, 7);
+                    *a7 *= 10;
+                    assert_eq!(*a8, 8);
+                    *a8 *= 10;
+                },
+            );
+
+            when6(
+                &c0,
+                &c1,
+                &c2,
+                &c3,
+                &c4,
+                &c5,
+                |mut a0, mut a1, mut a2, mut a3, mut a4, mut a5| {
+                    assert_eq!(*a0, 0);
+                    *a0 *= 10;
+                    assert_eq!(*a1, 10);
+                    *a1 *= 10;
+                    assert_eq!(*a2, 20);
+                    *a2 *= 10;
+                    assert_eq!(*a3, 30);
+                    *a3 *= 10;
+                    assert_eq!(*a4, 40);
+                    *a4 *= 10;
+                    assert_eq!(*a5, 50);
+                    *a5 *= 10;
+                },
+            );
+
+            when3(&c0, &c1, &c2, |mut a0, mut a1, mut a2| {
+                assert_eq!(*a0, 0);
+                *a0 *= 10;
+                assert_eq!(*a1, 100);
+                *a1 *= 10;
+                assert_eq!(*a2, 200);
+                *a2 *= 10;
+            });
+
+            when9(
+                &c0,
+                &c1,
+                &c2,
+                &c3,
+                &c4,
+                &c5,
+                &c6,
+                &c7,
+                &c8,
+                |mut a0, mut a1, mut a2, mut a3, mut a4, mut a5, mut a6, mut a7, mut a8| {
+                    assert_eq!(*a0, 0);
+                    *a0 *= 10;
+                    assert_eq!(*a1, 1000);
+                    *a1 *= 10;
+                    assert_eq!(*a2, 2000);
+                    *a2 *= 10;
+                    assert_eq!(*a3, 300);
+                    *a3 *= 10;
+                    assert_eq!(*a4, 400);
+                    *a4 *= 10;
+                    assert_eq!(*a5, 500);
+                    *a5 *= 10;
+                    assert_eq!(*a6, 60);
+                    *a6 *= 10;
+                    assert_eq!(*a7, 70);
+                    *a7 *= 10;
+                    assert_eq!(*a8, 80);
+                    *a8 *= 10;
+                },
+            );
+        });
+    }
 }

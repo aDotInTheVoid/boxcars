@@ -15,7 +15,16 @@
                 "SNMALLOC_PLATFORM_HAS_GETENTROPY",
                 "SNMALLOC_USE_CXX17"
             ],
-            "compilerPath": "/usr/bin/clang",
+            /*
+            In clang-18, they changed they way that stddef is implemented to rely on 
+            a preprocessor intrinsic to access the module system. As vscode's c++
+            frontend doesn't know about this, it manages to parse stddef.h without
+            finding the definition of size_t. This leads to all sorts of horrific
+            parsing errors, which then cascade into horrific name-resolution errors.
+
+            To work around, use clang-17's headers for vscode autocomplete.
+            */
+            "compilerPath": "/usr/bin/clang-17",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "linux-clang-x64"

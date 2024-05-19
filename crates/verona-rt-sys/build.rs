@@ -22,10 +22,9 @@ fn main() {
 
     while let Some(flag) = flags.next() {
         match flag {
-            "-Zsanitizer=thread" => z_sanitizer_thread = true,
-            "-Zsanitizer=address" => z_sanitizer_address = true,
-            "" | "-Zmacro-backtrace" => {}
-            other => panic!("unknown flag {other:?}"),
+            "-Zsanitizer=thread" | "sanitizer=thread" => z_sanitizer_thread = true,
+            "-Zsanitizer=address" | "sanitizer=address" => z_sanitizer_address = true,
+            _ => {}
         }
     }
 

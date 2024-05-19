@@ -19,7 +19,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
     - run: cargo build --all
-    - run: cargo test --all
+    - run: RUSTFLAGS='--cfg slow_tests' cargo test --all
     - run: cargo test --all --features flight_recorder
     # TODO: Test under systematic_testing.
     # RUSTFLAGS=-Zsanitizer=address cargo +nightly test --features sanitizer_address --tests --lib --all

@@ -3,7 +3,11 @@ use std::time::{Duration, Instant};
 use verona_rt::log_snmalloc;
 use verona_rt::{with_leak_detector, CownPtr};
 
+// RUSTFLAGS='--cfg slow_tests' cargo test --all
+#[cfg(slow_tests)]
 const TIME_TO_RUN: Duration = Duration::from_secs(10);
+#[cfg(not(slow_tests))]
+const TIME_TO_RUN: Duration = Duration::from_secs(1);
 
 #[test]
 fn main() {

@@ -40,7 +40,12 @@ impl_collection_once!(when2 Func2 <c1 A, c2 B>);
 impl_collection_once!(when3 Func3 <c1 A, c2 B, c3 C>);
 impl_collection_once!(when4 Func4 <c1 A, c2 B, c3 C, c4 D>);
 impl_collection_once!(when5 Func5 <c1 A, c2 B, c3 C, c4 D, c5 E>);
-// TODO: More
+impl_collection_once!(when6 Func6 <c1 A, c2 B, c3 C, c4 D, c5 E, c6 F>);
+impl_collection_once!(when7 Func7 <c1 A, c2 B, c3 C, c4 D, c5 E, c6 F, c7 G>);
+impl_collection_once!(when8 Func8 <c1 A, c2 B, c3 C, c4 D, c5 E, c6 F, c7 G, c8 H>);
+impl_collection_once!(when9 Func9 <c1 A, c2 B, c3 C, c4 D, c5 E, c6 F, c7 G, c8 H, g9 I>);
+
+// TODO: More?
 
 #[cfg(test)]
 mod tests {

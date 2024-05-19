@@ -6,7 +6,15 @@
                 "${workspaceFolder}/crates/verona-rt-sys/verona-rt/src/rt",
                 "${workspaceFolder}/crates/verona-rt-sys/snmalloc/src/"
             ],
-            "defines": [],
+            "defines": [
+                "MALLOC_USABLE_SIZE_QUALIFIER=const",
+                "SNMALLOC_CHEAP_CHECKS",
+                "SNMALLOC_HAS_LINUX_RANDOM_H",
+                "SNMALLOC_NO_REALLOCARR",
+                "SNMALLOC_NO_REALLOCARRAY",
+                "SNMALLOC_PLATFORM_HAS_GETENTROPY",
+                "SNMALLOC_USE_CXX17"
+            ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c17",
             "cppStandard": "c++17",

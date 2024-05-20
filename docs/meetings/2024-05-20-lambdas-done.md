@@ -1,0 +1,6 @@
+- Less interesting: we ported/did bindings for verona-rt. 
+- More Interesting Presentation: Start from rust's gaurentees, and show it's limitations
+    - You have race freedom, but not deadlock freedom.
+    - No ordering gaurenttes on threads.
+- Evaluation: perf overhead vs c++
+    - But also: compare to std::sync and std::thread

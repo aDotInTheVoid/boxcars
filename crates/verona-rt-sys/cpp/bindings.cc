@@ -17,6 +17,7 @@ using verona::rt::Cown;
 using verona::rt::Descriptor;
 using verona::rt::Object;
 using verona::rt::Scheduler;
+using verona::rt::Slot;
 using verona::rt::Work;
 
 // Sane Rust platform assumptions.
@@ -255,20 +256,18 @@ extern "C"
   /*
    * Helpers to implement Behaviour::invoke
    */
-  BehaviourCore* boxcars_behaviourcore_from_work(Work* work)
+  void
+  boxcars_preinvoke(Work* work, Slot** slots, void** body, size_t* count_out)
   {
-    return BehaviourCore::from_work(work);
+    auto* be = BehaviourCore::from_work(work);
+    *slots = be->get_slots();
+    *body = be->get_body();
+    *count_out = be->count;
   }
-  void* boxcars_behaviourcore_get_body(BehaviourCore* be)
+  void boxcars_postinvoke(Work* work)
   {
-    return be->get_body();
-  }
-  void boxcars_behaviourcore_release_all(BehaviourCore* be)
-  {
+    auto* be = BehaviourCore::from_work(work);
     be->release_all();
-  }
-  void boxcars_work_dealloc(Work* work)
-  {
     work->dealloc();
   }
 
@@ -277,11 +276,15 @@ extern "C"
     *size = sizeof(Descriptor);
     *align = alignof(Descriptor);
   }
-
   void boxcars_test_cown_info(size_t* size, size_t* align)
   {
     *size = sizeof(Cown);
     *align = alignof(Cown);
+  }
+  void boxcars_test_slot_info(size_t* size, size_t* align)
+  {
+    *size = sizeof(Slot);
+    *align = alignof(Slot);
   }
 
   void boxcars_snmalloc_message(const char* ptr, size_t len)

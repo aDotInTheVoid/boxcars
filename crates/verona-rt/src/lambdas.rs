@@ -1,4 +1,5 @@
 use core::{mem, ptr};
+use std::sync::atomic::AtomicUsize;
 
 use verona_rt_sys as ffi;
 
@@ -6,9 +7,11 @@ use verona_rt_sys as ffi;
 #[derive(Clone, Copy)]
 struct WorkPtr(*mut ());
 
-#[repr(transparent)]
-#[derive(Clone, Copy)]
-struct BehaviourCorePtr(*mut ());
+#[repr(C)]
+struct Slot {
+    cown: ffi::CownPtr,
+    _scheginfo: AtomicUsize,
+}
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
@@ -19,7 +22,6 @@ extern "C" {
     size_t payload_size,
     void* payload
      */
-
     fn boxcars_sched_lambda(
         n_cowns: usize,
         cowns: *const ffi::CownPtr,
@@ -28,10 +30,15 @@ extern "C" {
         payload: *const (),
     );
 
-    fn boxcars_behaviourcore_from_work(w: WorkPtr) -> BehaviourCorePtr;
-    fn boxcars_behaviourcore_get_body(w: BehaviourCorePtr) -> *mut ();
-    fn boxcars_behaviourcore_release_all(b: BehaviourCorePtr);
-    fn boxcars_work_dealloc(w: WorkPtr);
+    // boxcars_preinvoke(Work* work, Slot** slots, void** body, size_t* count)
+    fn boxcars_preinvoke(
+        work: WorkPtr,
+        slots: &mut *const Slot,
+        body: &mut *const (),
+        count: &mut usize,
+    );
+
+    fn boxcars_postinvoke(work: WorkPtr);
 }
 
 pub fn schedule_lambda<F>(func: F)
@@ -61,20 +68,21 @@ where
     }
 }
 
-extern "C" fn invoke_trampoline<F>(w: WorkPtr)
+extern "C" fn invoke_trampoline<F>(work: WorkPtr)
 where
     F: FnOnce() + Send + 'static,
 {
     unsafe {
-        let be = boxcars_behaviourcore_from_work(w);
+        let mut slots = ptr::null();
+        let mut body = ptr::null();
+        let mut count = 0;
 
-        let body = boxcars_behaviourcore_get_body(be);
+        boxcars_preinvoke(work, &mut slots, &mut body, &mut count);
 
         let func: F = ptr::read(body as *const F);
         func();
 
-        boxcars_behaviourcore_release_all(be);
-        boxcars_work_dealloc(w);
+        boxcars_postinvoke(work);
     }
 }
 
@@ -119,5 +127,17 @@ mod tests {
             assert_eq!(*check.lock().unwrap(), false);
         });
         assert_eq!(*check.lock().unwrap(), true);
+    }
+
+    #[test]
+    fn slot_info() {
+        extern "C" {
+            fn boxcars_test_slot_info(size: &mut usize, align: &mut usize);
+        }
+
+        let (mut size, mut align) = (0, 0);
+        unsafe { boxcars_test_slot_info(&mut size, &mut align) };
+        assert_eq!(size, mem::size_of::<Slot>());
+        assert_eq!(align, mem::align_of::<Slot>());
     }
 }

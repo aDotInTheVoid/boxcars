@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use verona_rt_sys as ffi;
 
-use crate::{cown::CownPtr, lambdas::Slot};
+use crate::cown::CownPtr;
 
 pub struct AcquiredCown<'a, T> {
     // TODO: As an optimization, point to the `T`, and roll the pointer back to
@@ -43,7 +43,7 @@ impl<'a, T: fmt::Display> fmt::Display for AcquiredCown<'a, T> {
     }
 }
 
-unsafe fn make_aq<'a, T>(aq: &Slot) -> AcquiredCown<'a, T> {
+unsafe fn make_aq<'a, T>(aq: &ffi::Slot) -> AcquiredCown<'a, T> {
     AcquiredCown {
         ptr: aq.cown,
         marker: PhantomData,

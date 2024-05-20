@@ -55,8 +55,15 @@ pub struct OpaqueCown {
     _marker: core::mem::MaybeUninit<[*const (); 3]>,
 }
 
-// typedef void (*WhenNFunc)(size_t, Cown**, void*);
-pub type WhenNFunc = extern "C" fn(usize, *mut CownPtr, *mut ());
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct WorkPtr(*mut ());
+
+#[repr(C)]
+pub struct Slot {
+    pub cown: CownPtr,
+    _scheginfo: core::sync::atomic::AtomicUsize,
+}
 
 #[link(name = "boxcar_bindings")]
 extern "C" {
@@ -100,17 +107,20 @@ extern "C" {
     pub fn enable_logging();
     pub fn dump_flight_recorder();
 
-    // boxcars_sched_##n(size_t len, Cown** ptr, WhenNFunc func, void* data)
-
-    pub fn boxcars_sched_1(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_2(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_3(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_4(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_5(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_6(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_7(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_8(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
-    pub fn boxcars_sched_9(len: usize, ptr: *mut CownPtr, func: WhenNFunc, data: *mut ());
+    pub fn boxcars_sched_lambda(
+        n_cowns: usize,
+        cowns: *const CownPtr,
+        f: extern "C" fn(WorkPtr),
+        payload_size: usize,
+        payload: *const (),
+    );
+    pub fn boxcars_preinvoke(
+        work: WorkPtr,
+        slots: &mut *const Slot,
+        body: &mut *const (),
+        count: &mut usize,
+    );
+    pub fn boxcars_postinvoke(work: WorkPtr);
 
     pub fn boxcar_log_cstr(ptr: *const core::ffi::c_char);
     pub fn boxcar_log_usize(n: usize);
@@ -133,4 +143,16 @@ fn cown_size_and_align() {
     }
     assert_eq!(size, std::mem::size_of::<OpaqueCown>());
     assert_eq!(align, std::mem::align_of::<OpaqueCown>())
+}
+
+#[test]
+fn slot_size_and_align() {
+    extern "C" {
+        fn boxcars_test_slot_info(size: &mut usize, align: &mut usize);
+    }
+
+    let (mut size, mut align) = (0, 0);
+    unsafe { boxcars_test_slot_info(&mut size, &mut align) };
+    assert_eq!(size, std::mem::size_of::<Slot>());
+    assert_eq!(align, std::mem::align_of::<Slot>());
 }

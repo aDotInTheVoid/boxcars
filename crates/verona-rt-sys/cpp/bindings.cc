@@ -24,40 +24,6 @@ using verona::rt::Work;
 static_assert(sizeof(void*) == sizeof(size_t));
 static_assert(sizeof(void*) == sizeof(ptrdiff_t));
 
-typedef void (*WhenNFunc)(size_t, Cown**, void*);
-
-template<size_t N_COWNS>
-struct CownThunk
-{
-  std::array<Cown*, N_COWNS> cowns_;
-  WhenNFunc thunk_;
-  void* data_;
-
-  void operator()()
-  {
-    // TODO: remove size param.
-    thunk_(N_COWNS, cowns_.data(), data_);
-  }
-};
-
-template<size_t N_COWNS>
-static std::array<Cown*, N_COWNS> gather_cown(size_t len, Cown** ptr)
-{
-  assert(len == N_COWNS);
-  std::array<Cown*, N_COWNS> arr;
-  memcpy(arr.data(), ptr, sizeof(arr));
-  return arr;
-}
-
-template<size_t N_COWNS>
-static void schedule_n(size_t len, Cown** ptr, WhenNFunc func, void* data)
-{
-  assert(len == N_COWNS);
-  auto cownarr = gather_cown<N_COWNS>(len, ptr);
-  auto lambda = CownThunk<N_COWNS>{cownarr, func, data};
-  verona::rt::schedule_lambda(N_COWNS, ptr, std::move(lambda));
-}
-
 extern "C"
 {
   /*
@@ -216,7 +182,6 @@ extern "C"
   {
     /* static Behaviour* make(size_t count, T&& f) */
     auto* behaviour_core = BehaviourCore::make(n_cowns, f, payload_size);
-
     memcpy(behaviour_core->get_body(), payload, payload_size);
 
     /* prepare_to_schedule(size_t count, Request* requests, T&& f) */

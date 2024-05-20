@@ -1,50 +1,11 @@
 use core::{mem, ptr, slice};
-use std::sync::atomic::AtomicUsize;
 
 use verona_rt_sys as ffi;
-
-#[repr(transparent)]
-#[derive(Clone, Copy)]
-struct WorkPtr(*mut ());
-
-#[repr(C)]
-pub(crate) struct Slot {
-    pub cown: ffi::CownPtr,
-    _scheginfo: AtomicUsize,
-}
-
-#[link(name = "boxcar_bindings")]
-extern "C" {
-    /*
-    size_t n_cowns,
-    Cown** cowns,
-    void (*f)(Work*),
-    size_t payload_size,
-    void* payload
-     */
-    fn boxcars_sched_lambda(
-        n_cowns: usize,
-        cowns: *const ffi::CownPtr,
-        f: extern "C" fn(WorkPtr),
-        payload_size: usize,
-        payload: *const (),
-    );
-
-    // boxcars_preinvoke(Work* work, Slot** slots, void** body, size_t* count)
-    fn boxcars_preinvoke(
-        work: WorkPtr,
-        slots: &mut *const Slot,
-        body: &mut *const (),
-        count: &mut usize,
-    );
-
-    fn boxcars_postinvoke(work: WorkPtr);
-}
 
 pub(crate) fn schedule_lambda<F>(func: F, cowns: &[ffi::CownPtr])
 where
     // TODO: Is this the right bound?
-    F: FnOnce(&[Slot]) + Send + 'static,
+    F: FnOnce(&[ffi::Slot]) + Send + 'static,
 {
     // TODO: Use inline-const here.
     // const {
@@ -56,7 +17,7 @@ where
     let invoke = invoke_trampoline::<F>;
 
     unsafe {
-        boxcars_sched_lambda(
+        ffi::boxcars_sched_lambda(
             cowns.len(),
             cowns.as_ptr(),
             invoke,
@@ -73,23 +34,23 @@ where
     schedule_lambda(|_| f(), &[]);
 }
 
-extern "C" fn invoke_trampoline<F>(work: WorkPtr)
+extern "C" fn invoke_trampoline<F>(work: ffi::WorkPtr)
 where
-    F: FnOnce(&[Slot]) + Send + 'static,
+    F: FnOnce(&[ffi::Slot]) + Send + 'static,
 {
     unsafe {
         let mut slots = ptr::null();
         let mut body = ptr::null();
         let mut count = 0;
 
-        boxcars_preinvoke(work, &mut slots, &mut body, &mut count);
+        ffi::boxcars_preinvoke(work, &mut slots, &mut body, &mut count);
 
         let slots = slice::from_raw_parts(slots, count);
 
         let func: F = ptr::read(body as *const F);
         func(slots);
 
-        boxcars_postinvoke(work);
+        ffi::boxcars_postinvoke(work);
     }
 }
 
@@ -134,17 +95,5 @@ mod tests {
             assert_eq!(*check.lock().unwrap(), false);
         });
         assert_eq!(*check.lock().unwrap(), true);
-    }
-
-    #[test]
-    fn slot_info() {
-        extern "C" {
-            fn boxcars_test_slot_info(size: &mut usize, align: &mut usize);
-        }
-
-        let (mut size, mut align) = (0, 0);
-        unsafe { boxcars_test_slot_info(&mut size, &mut align) };
-        assert_eq!(size, mem::size_of::<Slot>());
-        assert_eq!(align, mem::align_of::<Slot>());
     }
 }

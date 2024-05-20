@@ -1,18 +1,19 @@
-use crate::when as mwhen;
-use crate::CownPtr;
+use crate::{AcquiredCown, CownPtr};
 
-pub fn when<C>(cowns: C, func: C::Func)
-where
-    C: CownCollection,
-{
-    cowns.schedule(func)
+pub trait CownCollection {
+    type Acquired<'a>;
+
+    fn schedule_onto<F>(self, func: F)
+    where
+        F: for<'a> FnOnce(Self::Acquired<'a>) + Send + 'static;
 }
 
-// TODO: This should be sealed.
-pub trait CownCollection {
-    type Func;
-
-    fn schedule(self, f: Self::Func);
+pub fn when<C, F>(cowns: C, func: F)
+where
+    C: CownCollection,
+    F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
+{
+    cowns.schedule_onto(func)
 }
 
 macro_rules! impl_collection_once {
@@ -25,11 +26,16 @@ macro_rules! impl_collection_once {
     ) => {
         #[allow(unused_parens)]
         impl<$($gty: 'static),+> CownCollection for ($(&CownPtr<$gty>),+) {
-            type Func = mwhen::$fntname < $($gty),+>;
+            type Acquired<'a> = ($(AcquiredCown<'a, $gty>),+);
 
-            fn schedule(self, f: Self::Func) {
+            fn schedule_onto<Func>(self, func: Func)
+            where
+                Func: for<'a> FnOnce(Self::Acquired<'a>) + Send + 'static,
+            {
+                use crate::when as mwhen;
+
                 let ($($cname),+) = self;
-                mwhen::$fnname($($cname),+ , f);
+                mwhen::$fnname($($cname),+ , |$($cname),+| func(($($cname),+)));
             }
         }
     };
@@ -60,7 +66,7 @@ mod tests {
             let c2 = CownPtr::new(3);
             let c5 = CownPtr::new(8);
 
-            when((&c1, &c2, &c5), |mut a, b, mut c| {
+            when((&c1, &c2, &c5), |(mut a, b, mut c)| {
                 assert_eq!(*a, 1);
                 assert_eq!(*b, 3);
                 assert_eq!(*c, 8);
@@ -69,7 +75,7 @@ mod tests {
                 *c = 12;
             });
 
-            when((&c1, &c5), |a, c| {
+            when((&c1, &c5), |(a, c)| {
                 assert_eq!(*a, 10);
                 assert_eq!(*c, 12);
             })

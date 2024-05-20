@@ -12,7 +12,7 @@
 //!     assert_eq!(&*v, &[]);
 //!     v.push(101);
 //! });
-//! when((&string, &vec), |mut s, mut v| {
+//! when((&string, &vec), |(mut s, mut v)| {
 //!     assert_eq!(&*s, "foo");
 //!     assert_eq!(&*v, &[101]);
 //!     s.push_str("bar");

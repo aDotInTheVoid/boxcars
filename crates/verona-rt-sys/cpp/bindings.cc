@@ -11,49 +11,18 @@
 #include <sched/cown.h>
 #include <sched/schedulerthread.h>
 
+using verona::rt::Behaviour;
+using verona::rt::BehaviourCore;
 using verona::rt::Cown;
 using verona::rt::Descriptor;
 using verona::rt::Object;
 using verona::rt::Scheduler;
+using verona::rt::Slot;
+using verona::rt::Work;
 
 // Sane Rust platform assumptions.
 static_assert(sizeof(void*) == sizeof(size_t));
 static_assert(sizeof(void*) == sizeof(ptrdiff_t));
-
-typedef void (*WhenNFunc)(size_t, Cown**, void*);
-
-template<size_t N_COWNS>
-struct CownThunk
-{
-  std::array<Cown*, N_COWNS> cowns_;
-  WhenNFunc thunk_;
-  void* data_;
-
-  void operator()()
-  {
-    // TODO: remove size param.
-    thunk_(N_COWNS, cowns_.data(), data_);
-  }
-};
-
-template<size_t N_COWNS>
-static std::array<Cown*, N_COWNS> gather_cown(size_t len, Cown** ptr)
-{
-  assert(len == N_COWNS);
-  std::array<Cown*, N_COWNS> arr;
-  memcpy(arr.data(), ptr, sizeof(arr));
-  return arr;
-}
-
-// TODO: Expose variadic API.
-template<size_t N_COWNS>
-static void schedule_n(size_t len, Cown** ptr, WhenNFunc func, void* data)
-{
-  assert(len == N_COWNS);
-  auto cownarr = gather_cown<N_COWNS>(len, ptr);
-  auto lambda = CownThunk<N_COWNS>{cownarr, func, data};
-  verona::rt::schedule_lambda(N_COWNS, ptr, std::move(lambda));
-}
 
 extern "C"
 {
@@ -204,36 +173,63 @@ extern "C"
     return cown;
   }
 
-  // TODO: Use requests
-  // TODO: Variadic.
+  void boxcars_sched_lambda(
+    size_t n_cowns,
+    Cown** cowns,
+    void (*f)(Work*),
+    size_t payload_size,
+    void* payload)
+  {
+    /* static Behaviour* make(size_t count, T&& f) */
+    auto* behaviour_core = BehaviourCore::make(n_cowns, f, payload_size);
+    memcpy(behaviour_core->get_body(), payload, payload_size);
 
-#define BUILD_SCHEDULE(n) \
-  void boxcars_sched_##n(size_t len, Cown** ptr, WhenNFunc func, void* data) \
-  { \
-    assert(len == n); \
-    schedule_n<n>(len, ptr, func, data); \
+    /* prepare_to_schedule(size_t count, Request* requests, T&& f) */
+    auto* body = (Behaviour*)(behaviour_core);
+    auto* slots = body->get_slots();
+    for (size_t i = 0; i < n_cowns; i++)
+    {
+      new (&slots[i]) verona::rt::Slot(cowns[i]);
+      // TODO: We can put move info here.
+    }
+
+    /* schedule(size_t count, Request* requests, T&& f) */
+    BehaviourCore* arr[] = {body};
+    BehaviourCore::schedule_many(arr, 1);
   }
 
-  BUILD_SCHEDULE(1)
-  BUILD_SCHEDULE(2)
-  BUILD_SCHEDULE(3)
-  BUILD_SCHEDULE(4)
-  BUILD_SCHEDULE(5)
-  BUILD_SCHEDULE(6)
-  BUILD_SCHEDULE(7)
-  BUILD_SCHEDULE(8)
-  BUILD_SCHEDULE(9)
+  /*
+   * Helpers to implement Behaviour::invoke
+   */
+  void
+  boxcars_preinvoke(Work* work, Slot** slots, void** body, size_t* count_out)
+  {
+    auto* be = BehaviourCore::from_work(work);
+    *slots = be->get_slots();
+    *body = be->get_body();
+    *count_out = be->count;
+  }
+  void boxcars_postinvoke(Work* work)
+  {
+    auto* be = BehaviourCore::from_work(work);
+    be->release_all();
+    work->dealloc();
+  }
 
   void boxcars_test_descriptor_info(size_t* size, size_t* align)
   {
     *size = sizeof(Descriptor);
     *align = alignof(Descriptor);
   }
-
   void boxcars_test_cown_info(size_t* size, size_t* align)
   {
     *size = sizeof(Cown);
     *align = alignof(Cown);
+  }
+  void boxcars_test_slot_info(size_t* size, size_t* align)
+  {
+    *size = sizeof(Slot);
+    *align = alignof(Slot);
   }
 
   void boxcars_snmalloc_message(const char* ptr, size_t len)

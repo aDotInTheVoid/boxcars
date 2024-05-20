@@ -24,7 +24,7 @@ macro_rules! impl_collection_once {
         >
     ) => {
         #[allow(unused_parens)]
-        impl<$($gty),+> CownCollection for ($(&CownPtr<$gty>),+) {
+        impl<$($gty: 'static),+> CownCollection for ($(&CownPtr<$gty>),+) {
             type Func = mwhen::$fntname < $($gty),+>;
 
             fn schedule(self, f: Self::Func) {

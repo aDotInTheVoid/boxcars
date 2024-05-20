@@ -1,4 +1,4 @@
-use core::{fmt, marker::PhantomData, mem, ops, slice};
+use core::{fmt, marker::PhantomData, ops};
 use std::ops::Deref;
 
 use verona_rt_sys as ffi;
@@ -43,9 +43,9 @@ impl<'a, T: fmt::Display> fmt::Display for AcquiredCown<'a, T> {
     }
 }
 
-unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
+unsafe fn make_aq<'a, T>(aq: &ffi::Slot) -> AcquiredCown<'a, T> {
     AcquiredCown {
-        ptr: aq,
+        ptr: aq.cown,
         marker: PhantomData,
     }
 }
@@ -53,7 +53,6 @@ unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
 macro_rules! one_when {
     (
         $whenfunc:ident
-        $ffiname:ident
         $usefunc:ident
         $tramp_name:ident
         <
@@ -62,23 +61,21 @@ macro_rules! one_when {
     ) => {
         pub(crate) type $usefunc<$($gty),+> = for <$($glife),+> fn($(AcquiredCown<$glife, $gty>),+);
 
-
-        extern "C" fn $tramp_name<$($gty),+>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
-            unsafe {
-                let s = slice::from_raw_parts(cowns, len);
-                let func: $usefunc<$($gty),+> = mem::transmute(data);
-                func($(make_aq(s[$idx])),+)
-            }
-        }
-
-        pub fn $whenfunc<$($gty),+>($($cname: &CownPtr<$gty>),+, f: $usefunc<$($gty),+>) {
-            let trampoline = $tramp_name::<$($gty),+>;
-            let mut cs = [$($cname.cown_ptr),+];
+        pub fn $whenfunc
+            <Func, $($gty : 'static ),+>
+        ($($cname: &CownPtr<$gty>),+, func: Func)
+            where
+                Func: for <$($glife),+> FnOnce( $(AcquiredCown<$glife, $gty>),+)
+                    + Send + 'static
+         {
+            let  cs = [$($cname.cown_ptr),+];
             assert!(is_unique(&cs), "Cowns not unique");
-            unsafe {
-                ffi::$ffiname(cs.len(), cs.as_mut_ptr(), trampoline, f as _);
-            }
-
+            $crate::schedule_lambda(
+                move |s| {
+                    unsafe { func($(make_aq(&s[$idx])),+) }
+                },
+                &cs
+            );
         }
     };
 }
@@ -86,15 +83,15 @@ macro_rules! one_when {
 // TODO: Add when0
 // one_when!(when0 boxcars_sched_0 Func0 t0 <>);
 
-one_when!(when1 boxcars_sched_1 Func1 t1 <A 'a cown0 0>);
-one_when!(when2 boxcars_sched_2 Func2 t2 <A 'a cown0 0, B 'b cown1 1>);
-one_when!(when3 boxcars_sched_3 Func3 t3 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2>);
-one_when!(when4 boxcars_sched_4 Func4 t4 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3>);
-one_when!(when5 boxcars_sched_5 Func5 t5 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4>);
-one_when!(when6 boxcars_sched_6 Func6 t6 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5>);
-one_when!(when7 boxcars_sched_7 Func7 t7 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6>);
-one_when!(when8 boxcars_sched_8 Func8 t8 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7>);
-one_when!(when9 boxcars_sched_9 Func9 t9 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7, I 'i cown8 8>);
+one_when!(when1 Func1 t1 <A 'a cown0 0>);
+one_when!(when2 Func2 t2 <A 'a cown0 0, B 'b cown1 1>);
+one_when!(when3 Func3 t3 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2>);
+one_when!(when4 Func4 t4 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3>);
+one_when!(when5 Func5 t5 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4>);
+one_when!(when6 Func6 t6 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5>);
+one_when!(when7 Func7 t7 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6>);
+one_when!(when8 Func8 t8 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7>);
+one_when!(when9 Func9 t9 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7, I 'i cown8 8>);
 
 // FIXME: LLVM eat's shit on this codegen. https://godbolt.org/z/s9sqGqGbP
 fn is_unique<const N: usize>(cown: &[ffi::CownPtr; N]) -> bool {
@@ -112,6 +109,7 @@ mod tests {
         },
         thread,
     };
+    use stdx::SetOnDrop;
 
     use crate::{scheduler, with_leak_detector};
 
@@ -242,25 +240,6 @@ mod tests {
                 assert_eq!(format!("{x:?}"), r#""101""#);
             })
         })
-    }
-
-    struct SetOnDrop(Arc<Mutex<bool>>);
-    impl std::ops::Drop for SetOnDrop {
-        fn drop(&mut self) {
-            if std::thread::panicking() {
-                return;
-            }
-
-            let mut is_droped = self.0.lock().unwrap();
-            assert_eq!(*is_droped, false);
-            *is_droped = true;
-        }
-    }
-    impl SetOnDrop {
-        fn new() -> (Self, Arc<Mutex<bool>>) {
-            let state: Arc<Mutex<bool>> = Arc::default();
-            (Self(state.clone()), state)
-        }
     }
 
     #[test]
@@ -463,5 +442,29 @@ mod tests {
                 },
             );
         });
+    }
+
+    #[test]
+    fn lambda_one() {
+        with_leak_detector(|| {
+            let shared = Arc::new(Mutex::new(10));
+            let shared2 = Arc::clone(&shared);
+
+            let cown = CownPtr::new(1);
+
+            when1(&cown, move |mut s| {
+                assert_eq!(*s, 1);
+                let mut shared = shared.lock().unwrap();
+                assert_eq!(*shared, 10);
+                *shared = 20;
+                *s = 2;
+            });
+
+            when1(&cown, move |s| {
+                assert_eq!(*s, 2);
+                let shared = shared2.lock().unwrap();
+                assert_eq!(*shared, 20);
+            });
+        })
     }
 }

@@ -55,6 +55,11 @@ impl_collection_once!(when9 Func9 <c1 A, c2 B, c3 C, c4 D, c5 E, c6 F, c7 G, c8 
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        atomic::{AtomicI16, Ordering},
+        Arc,
+    };
+
     use crate::with_leak_detector;
 
     use super::*;
@@ -80,5 +85,46 @@ mod tests {
                 assert_eq!(*c, 12);
             })
         });
+    }
+
+    #[test]
+    fn lambda() {
+        with_leak_detector(|| {
+            let x = Arc::new(AtomicI16::new(10));
+            let c1 = CownPtr::new(10);
+            let c2 = CownPtr::new(20);
+            let c3 = CownPtr::new(30);
+
+            let x_ = x.clone();
+            when((&c1, &c2), move |(a1, a2)| {
+                assert_eq!(*a1, 10);
+                assert_eq!(*a2, 20);
+
+                assert_eq!(x_.swap(100, Ordering::Relaxed), 10);
+            });
+
+            let x_ = x.clone();
+            when((&c2, &c3), move |(a2, a3)| {
+                assert_eq!(*a2, 20);
+                assert_eq!(*a3, 30);
+
+                assert_eq!(x_.swap(1000, Ordering::Relaxed), 100);
+            });
+
+            let x_ = x.clone();
+            when((&c3, &c1), move |(a3, a1)| {
+                assert_eq!(*a3, 30);
+                assert_eq!(*a1, 10);
+
+                assert_eq!(x_.swap(10000, Ordering::Relaxed), 1000);
+            });
+
+            when((&c1, &c2, &c3), move |(a1, a2, a3)| {
+                assert_eq!(*a1, 10);
+                assert_eq!(*a2, 20);
+                assert_eq!(*a3, 30);
+                assert_eq!(x.load(Ordering::Relaxed), 10000);
+            });
+        })
     }
 }

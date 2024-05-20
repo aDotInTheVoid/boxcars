@@ -108,10 +108,11 @@ mod tests {
     use std::{
         sync::{
             atomic::{AtomicU8, Ordering},
-            Arc, Barrier, Mutex,
+            Arc, Barrier,
         },
         thread,
     };
+    use stdx::SetOnDrop;
 
     use crate::{scheduler, with_leak_detector};
 
@@ -242,25 +243,6 @@ mod tests {
                 assert_eq!(format!("{x:?}"), r#""101""#);
             })
         })
-    }
-
-    struct SetOnDrop(Arc<Mutex<bool>>);
-    impl std::ops::Drop for SetOnDrop {
-        fn drop(&mut self) {
-            if std::thread::panicking() {
-                return;
-            }
-
-            let mut is_droped = self.0.lock().unwrap();
-            assert_eq!(*is_droped, false);
-            *is_droped = true;
-        }
-    }
-    impl SetOnDrop {
-        fn new() -> (Self, Arc<Mutex<bool>>) {
-            let state: Arc<Mutex<bool>> = Arc::default();
-            (Self(state.clone()), state)
-        }
     }
 
     #[test]

@@ -76,7 +76,8 @@
         "__tuple": "cpp",
         "__verbose_abort": "cpp",
         "ios": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "random": "cpp"
     },
     "cmake.sourceDirectory": "/home/alona/icnotes/60010-final-year-project/crates/verona-rt-sys/cpp",
     "cSpell.words": [

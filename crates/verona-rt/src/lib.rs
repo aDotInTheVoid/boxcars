@@ -58,6 +58,7 @@
 
 mod cown;
 mod descriptor;
+mod lambdas;
 mod log;
 mod scheduler;
 mod variadic_when;
@@ -69,3 +70,5 @@ pub use scheduler::{with as with_scheduler, with_leak_detector};
 pub use variadic_when::{when, CownCollection};
 pub use when::AcquiredCown;
 pub use when::{when1, when2, when3, when4, when5, when6, when7, when8, when9};
+
+pub use lambdas::schedule_lambda;

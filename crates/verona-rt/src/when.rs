@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use verona_rt_sys as ffi;
 
-use crate::cown::CownPtr;
+use crate::{cown::CownPtr, lambdas::Slot};
 
 pub struct AcquiredCown<'a, T> {
     // TODO: As an optimization, point to the `T`, and roll the pointer back to
@@ -43,9 +43,9 @@ impl<'a, T: fmt::Display> fmt::Display for AcquiredCown<'a, T> {
     }
 }
 
-unsafe fn make_aq<'a, T>(aq: ffi::CownPtr) -> AcquiredCown<'a, T> {
+unsafe fn make_aq<'a, T>(aq: &Slot) -> AcquiredCown<'a, T> {
     AcquiredCown {
-        ptr: aq,
+        ptr: aq.cown,
         marker: PhantomData,
     }
 }
@@ -63,20 +63,16 @@ macro_rules! one_when {
         pub(crate) type $usefunc<$($gty),+> = for <$($glife),+> fn($(AcquiredCown<$glife, $gty>),+);
 
 
-        extern "C" fn $tramp_name<$($gty),+>(len: usize, cowns: *mut ffi::CownPtr, data: *mut ()) {
-            unsafe {
-                let s = slice::from_raw_parts(cowns, len);
-                let func: $usefunc<$($gty),+> = mem::transmute(data);
-                func($(make_aq(s[$idx])),+)
-            }
-        }
-
-        pub fn $whenfunc<$($gty),+>($($cname: &CownPtr<$gty>),+, f: $usefunc<$($gty),+>) {
-            let trampoline = $tramp_name::<$($gty),+>;
-            let mut cs = [$($cname.cown_ptr),+];
+        pub fn $whenfunc<$($gty : 'static ),+>($($cname: &CownPtr<$gty>),+, func: $usefunc<$($gty),+>) {
+            let  cs = [$($cname.cown_ptr),+];
             assert!(is_unique(&cs), "Cowns not unique");
             unsafe {
-                ffi::$ffiname(cs.len(), cs.as_mut_ptr(), trampoline, f as _);
+                $crate::schedule_lambda(
+                    move |s| {
+                        func($(make_aq(&s[$idx])),+)
+                    },
+                    &cs
+                );
             }
 
         }

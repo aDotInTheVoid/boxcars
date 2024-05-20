@@ -72,3 +72,5 @@ pub use when::AcquiredCown;
 pub use when::{when1, when2, when3, when4, when5, when6, when7, when8, when9};
 
 pub use lambdas::when0;
+
+pub(crate) use lambdas::schedule_lambda;

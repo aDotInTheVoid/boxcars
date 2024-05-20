@@ -8,8 +8,8 @@ use verona_rt_sys as ffi;
 struct WorkPtr(*mut ());
 
 #[repr(C)]
-struct Slot {
-    cown: ffi::CownPtr,
+pub(crate) struct Slot {
+    pub cown: ffi::CownPtr,
     _scheginfo: AtomicUsize,
 }
 
@@ -41,7 +41,7 @@ extern "C" {
     fn boxcars_postinvoke(work: WorkPtr);
 }
 
-fn schedule_lambda<F>(func: F)
+pub(crate) fn schedule_lambda<F>(func: F, cowns: &[ffi::CownPtr])
 where
     // TODO: Is this the right bound?
     F: FnOnce(&[Slot]) + Send + 'static,
@@ -53,14 +53,12 @@ where
 
     let func_nodrop = mem::ManuallyDrop::new(func);
 
-    let s: &[ffi::CownPtr] = &[];
-
     let invoke = invoke_trampoline::<F>;
 
     unsafe {
         boxcars_sched_lambda(
-            0,
-            s.as_ptr(),
+            cowns.len(),
+            cowns.as_ptr(),
             invoke,
             mem::size_of::<F>(),
             &func_nodrop as *const _ as _,
@@ -72,7 +70,7 @@ pub fn when0<F>(f: F)
 where
     F: FnOnce() + Send + 'static,
 {
-    schedule_lambda(|_| f());
+    schedule_lambda(|_| f(), &[]);
 }
 
 extern "C" fn invoke_trampoline<F>(work: WorkPtr)

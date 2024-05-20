@@ -207,26 +207,6 @@ extern "C"
     return cown;
   }
 
-  // TODO: Use requests
-  // TODO: Variadic.
-
-#define BUILD_SCHEDULE(n) \
-  void boxcars_sched_##n(size_t len, Cown** ptr, WhenNFunc func, void* data) \
-  { \
-    assert(len == n); \
-    schedule_n<n>(len, ptr, func, data); \
-  }
-
-  BUILD_SCHEDULE(1)
-  BUILD_SCHEDULE(2)
-  BUILD_SCHEDULE(3)
-  BUILD_SCHEDULE(4)
-  BUILD_SCHEDULE(5)
-  BUILD_SCHEDULE(6)
-  BUILD_SCHEDULE(7)
-  BUILD_SCHEDULE(8)
-  BUILD_SCHEDULE(9)
-
   void boxcars_sched_lambda(
     size_t n_cowns,
     Cown** cowns,

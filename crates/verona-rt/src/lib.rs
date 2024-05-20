@@ -71,4 +71,4 @@ pub use variadic_when::{when, CownCollection};
 pub use when::AcquiredCown;
 pub use when::{when1, when2, when3, when4, when5, when6, when7, when8, when9};
 
-pub use lambdas::schedule_lambda;
+pub use lambdas::when0;

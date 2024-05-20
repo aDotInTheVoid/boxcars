@@ -1,4 +1,4 @@
-use core::{mem, ptr};
+use core::{mem, ptr, slice};
 use std::sync::atomic::AtomicUsize;
 
 use verona_rt_sys as ffi;
@@ -41,10 +41,10 @@ extern "C" {
     fn boxcars_postinvoke(work: WorkPtr);
 }
 
-pub fn schedule_lambda<F>(func: F)
+fn schedule_lambda<F>(func: F)
 where
     // TODO: Is this the right bound?
-    F: FnOnce() + Send + 'static,
+    F: FnOnce(&[Slot]) + Send + 'static,
 {
     // TODO: Use inline-const here.
     // const {
@@ -68,9 +68,16 @@ where
     }
 }
 
-extern "C" fn invoke_trampoline<F>(work: WorkPtr)
+pub fn when0<F>(f: F)
 where
     F: FnOnce() + Send + 'static,
+{
+    schedule_lambda(|_| f());
+}
+
+extern "C" fn invoke_trampoline<F>(work: WorkPtr)
+where
+    F: FnOnce(&[Slot]) + Send + 'static,
 {
     unsafe {
         let mut slots = ptr::null();
@@ -79,8 +86,10 @@ where
 
         boxcars_preinvoke(work, &mut slots, &mut body, &mut count);
 
+        let slots = slice::from_raw_parts(slots, count);
+
         let func: F = ptr::read(body as *const F);
-        func();
+        func(slots);
 
         boxcars_postinvoke(work);
     }
@@ -104,7 +113,7 @@ mod tests {
         with_leak_detector(|| {
             let shared_state = Arc::clone(&shared_state);
 
-            schedule_lambda(move || {
+            when0(move || {
                 assert_eq!(x, 10);
 
                 let mut state = shared_state.lock().unwrap();
@@ -121,7 +130,7 @@ mod tests {
     fn drops() {
         let (dropset, check) = SetOnDrop::new();
         with_leak_detector(|| {
-            schedule_lambda(|| {
+            when0(|| {
                 drop(dropset);
             });
             assert_eq!(*check.lock().unwrap(), false);

@@ -59,8 +59,6 @@ macro_rules! one_when {
         $($gty:ident $glife:lifetime $cname:ident $idx:literal),+
         >
     ) => {
-        pub(crate) type $usefunc<$($gty),+> = for <$($glife),+> fn($(AcquiredCown<$glife, $gty>),+);
-
         pub fn $whenfunc
             <Func, $($gty : 'static ),+>
         ($($cname: &CownPtr<$gty>),+, func: Func)
@@ -81,8 +79,6 @@ macro_rules! one_when {
 }
 
 // TODO: Add when0
-// one_when!(when0 boxcars_sched_0 Func0 t0 <>);
-
 one_when!(when1 Func1 t1 <A 'a cown0 0>);
 one_when!(when2 Func2 t2 <A 'a cown0 0, B 'b cown1 1>);
 one_when!(when3 Func3 t3 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2>);

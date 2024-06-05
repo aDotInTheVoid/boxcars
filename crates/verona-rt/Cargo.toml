@@ -21,6 +21,8 @@ sanitizer_thread  = ["__any_sanitizer", "verona-rt-sys/sanitizer_thread"]
 __any_sanitizer = []
 
 [dev-dependencies]
+# Fun hack to force clap to be built with help and color, for criterion.
+clap = { version = "4.5.4", features = ["std", "help"] }
 criterion = "0.5.1"
 stdx = { path = "../stdx" }
 

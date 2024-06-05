@@ -1,4 +1,4 @@
-use std::hint::black_box;
+use std::{hint::black_box, time::Instant};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
@@ -23,22 +23,12 @@ fn schedule_n_lambdas_onto_cown(n: usize) {
     });
 }
 
-fn busyloop_inside_when(n: usize) {
-    with_scheduler(|| {
-        let c = Cown::new(n);
-
-        when(&c, |c| {
-            unsafe { bbench_busy_loop(*c) };
-        })
-    })
-}
-
 extern "C" {
     fn bbench_create_n_cowns(n: usize);
     fn bbench_schedule_n_lambdas_onto_cown(n: usize);
-    fn bbeench_busyloop_inside_when(n: usize);
 
-    fn bbench_busy_loop(n: usize);
+    fn bbench_busyloop_inside_when(usecs: usize, iters: u64);
+    fn boxcars_busy_loop(usecs: usize);
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -50,14 +40,37 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 fn time_busy_loop(c: &mut Criterion) {
     let mut group = c.benchmark_group("Busy Loop");
 
-    for i in 0..10 {
-        group.bench_with_input(BenchmarkId::new("rust", i), &i, |b, i| {
-            b.iter(|| busyloop_inside_when(black_box(*i)))
+    for nsecs in 0..5 {
+        group.bench_with_input(BenchmarkId::new("Rust", nsecs), &nsecs, |b, nsecs| {
+            b.iter_custom(|iters| {
+                let start = Instant::now();
+                busyloop_inside_when(*nsecs, iters);
+                start.elapsed()
+            })
         });
-        group.bench_with_input(BenchmarkId::new("c++", i), &i, |b, i| {
-            b.iter(|| unsafe { bbeench_busyloop_inside_when(*i) })
+
+        group.bench_with_input(BenchmarkId::new("C++", nsecs), &nsecs, |b, nsecs| {
+            b.iter_custom(|iters| {
+                let start = Instant::now();
+                unsafe {
+                    bbench_busyloop_inside_when(*nsecs, iters);
+                }
+                start.elapsed()
+            })
         });
     }
+}
+
+fn busyloop_inside_when(usecs: usize, iters: u64) {
+    with_scheduler(|| {
+        let c = Cown::new(usecs);
+
+        for _ in 0..iters {
+            when(&c, |c| unsafe {
+                boxcars_busy_loop(*c);
+            })
+        }
+    });
 }
 
 fn time_n_cowns(c: &mut Criterion) {

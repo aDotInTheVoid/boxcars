@@ -239,9 +239,9 @@ extern "C"
 #endif
   }
 
-  void bbench_busy_loop(size_t n)
+  void boxcars_busy_loop(size_t usecs)
   {
-    busy_loop(n);
+    busy_loop(usecs);
   }
 
   // TODO: Don't put these in main binary
@@ -272,12 +272,16 @@ extern "C"
     Scheduler::get().run();
   }
 
-  void bbeench_busyloop_inside_when(size_t n)
+  void bbench_busyloop_inside_when(size_t nsecs, uint64_t iters)
   {
     Scheduler::get().init(1);
 
-    auto c = verona::cpp::make_cown<size_t>(n);
-    verona::cpp::when(c) << [](auto c) { busy_loop(*c); };
+    auto c = verona::cpp::make_cown<size_t>(nsecs);
+
+    for (int i = 0; i < iters; i++)
+    {
+      when(c) << [](auto c) { busy_loop(*c); };
+    }
 
     Scheduler::get().run();
   }

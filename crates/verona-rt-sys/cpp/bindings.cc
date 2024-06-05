@@ -258,20 +258,6 @@ extern "C"
     }
   }
 
-  void bbench_schedule_n_lambdas_onto_cown(size_t n)
-  {
-    Scheduler::get().init(1);
-
-    auto c = verona::cpp::make_cown<int32_t>(0);
-
-    for (int i = 0; i < n; i++)
-    {
-      verona::cpp::when(c) << [](auto c) { c++; };
-    }
-
-    Scheduler::get().run();
-  }
-
   void bbench_busyloop_inside_when(size_t nsecs, uint64_t iters)
   {
     Scheduler::get().init(1);
@@ -281,6 +267,26 @@ extern "C"
     for (int i = 0; i < iters; i++)
     {
       when(c) << [](auto c) { busy_loop(*c); };
+    }
+
+    Scheduler::get().run();
+  }
+
+  void bbench_schedule_n_lambdas_onto_cown(size_t n, uint64_t iters)
+  {
+    Scheduler::get().init(1);
+
+    auto threader = verona::cpp::make_cown<int>(0);
+
+    for (int i = 0; i < iters; i++)
+    {
+      auto c = verona::cpp::make_cown<int>(0);
+      for (int j = 0; j < n; j++)
+      {
+        when(c) << [](auto c) { c++; };
+      }
+
+      when(c, threader) << [](auto, auto) {};
     }
 
     Scheduler::get().run();

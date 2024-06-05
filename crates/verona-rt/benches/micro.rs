@@ -12,12 +12,30 @@ fn create_n_cowns(n: usize) -> Vec<Cown<usize>> {
     v
 }
 
-fn schedule_n_lambdas_onto_cown(n: usize) {
+fn schedule_n_lambdas_onto_cown(n: usize, iters: u64) {
     with_scheduler(|| {
-        let c = Cown::new(0);
-        for _ in 0..n {
-            when(&c, |mut c| {
-                *c += 1;
+        let threader = Cown::new(0);
+
+        for _ in 0..iters {
+            let c = Cown::new(0);
+            for _ in 0..n {
+                when(&c, |mut c| {
+                    *c += 1;
+                })
+            }
+
+            when((&c, &threader), |_| {});
+        }
+    });
+}
+
+fn busyloop_inside_when(usecs: usize, iters: u64) {
+    with_scheduler(|| {
+        let c = Cown::new(usecs);
+
+        for _ in 0..iters {
+            when(&c, |c| unsafe {
+                boxcars_busy_loop(*c);
             })
         }
     });
@@ -25,7 +43,7 @@ fn schedule_n_lambdas_onto_cown(n: usize) {
 
 extern "C" {
     fn bbench_create_n_cowns(n: usize);
-    fn bbench_schedule_n_lambdas_onto_cown(n: usize);
+    fn bbench_schedule_n_lambdas_onto_cown(n: usize, iters: u64);
 
     fn bbench_busyloop_inside_when(usecs: usize, iters: u64);
     fn boxcars_busy_loop(usecs: usize);
@@ -61,18 +79,6 @@ fn time_busy_loop(c: &mut Criterion) {
     }
 }
 
-fn busyloop_inside_when(usecs: usize, iters: u64) {
-    with_scheduler(|| {
-        let c = Cown::new(usecs);
-
-        for _ in 0..iters {
-            when(&c, |c| unsafe {
-                boxcars_busy_loop(*c);
-            })
-        }
-    });
-}
-
 fn time_n_cowns(c: &mut Criterion) {
     let mut group = c.benchmark_group("Create Cowns");
 
@@ -91,10 +97,18 @@ fn time_n_behaviours(c: &mut Criterion) {
 
     for i in (1..5).map(|i| i * 1000) {
         group.bench_with_input(BenchmarkId::new("rust", i), &i, |b, i| {
-            b.iter(|| schedule_n_lambdas_onto_cown(black_box(*i)))
+            b.iter_custom(|iters| {
+                let start = Instant::now();
+                schedule_n_lambdas_onto_cown(*i, iters);
+                start.elapsed()
+            });
         });
         group.bench_with_input(BenchmarkId::new("c++", i), &i, |b, i| {
-            b.iter(|| unsafe { bbench_schedule_n_lambdas_onto_cown(*i) })
+            b.iter_custom(|iters| {
+                let start = Instant::now();
+                unsafe { bbench_schedule_n_lambdas_onto_cown(*i, iters) };
+                start.elapsed()
+            });
         });
     }
 }

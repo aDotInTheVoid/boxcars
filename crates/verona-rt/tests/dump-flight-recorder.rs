@@ -28,6 +28,6 @@ fn main() {
     });
 
     unsafe {
-        verona_rt_sys::dump_flight_recorder();
+        verona_rt_sys::boxcars_dump_flight_recorder();
     }
 }

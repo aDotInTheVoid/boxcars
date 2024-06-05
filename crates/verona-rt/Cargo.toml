@@ -21,4 +21,9 @@ sanitizer_thread  = ["__any_sanitizer", "verona-rt-sys/sanitizer_thread"]
 __any_sanitizer = []
 
 [dev-dependencies]
+criterion = "0.5.1"
 stdx = { path = "../stdx" }
+
+[[bench]]
+name = "micro"
+harness = false

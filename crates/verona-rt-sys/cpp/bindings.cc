@@ -6,10 +6,9 @@
 #include <stdint.h>
 #include <string_view>
 // verona
-#include <cpp/lambdabehaviour.h>
-#include <object/object.h>
-#include <sched/cown.h>
-#include <sched/schedulerthread.h>
+#include <cpp/when.h>
+#include <debug/harness.h>
+#include <verona.h>
 
 using verona::rt::Behaviour;
 using verona::rt::BehaviourCore;
@@ -125,7 +124,7 @@ extern "C"
   {
     Logging::cout() << p;
   }
-  void dump_flight_recorder()
+  void boxcars_dump_flight_recorder()
   {
     Logging::SysLog::dump_flight_recorder();
   }
@@ -238,5 +237,48 @@ extern "C"
 #ifdef SNMALLOC_TRACING
     snmalloc::message<1024>("{}", s);
 #endif
+  }
+
+  void bbench_busy_loop(size_t n)
+  {
+    busy_loop(n);
+  }
+
+  // TODO: Don't put these in main binary
+  void bbench_create_n_cowns(size_t n)
+  {
+    using verona::cpp::make_cown;
+
+    std::vector<verona::cpp::cown_ptr<size_t>> v;
+    v.reserve(n);
+
+    for (int i = 0; i < n; i++)
+    {
+      v.push_back(make_cown<size_t>(i));
+    }
+  }
+
+  void bbench_schedule_n_lambdas_onto_cown(size_t n)
+  {
+    Scheduler::get().init(1);
+
+    auto c = verona::cpp::make_cown<int32_t>(0);
+
+    for (int i = 0; i < n; i++)
+    {
+      verona::cpp::when(c) << [](auto c) { c++; };
+    }
+
+    Scheduler::get().run();
+  }
+
+  void bbeench_busyloop_inside_when(size_t n)
+  {
+    Scheduler::get().init(1);
+
+    auto c = verona::cpp::make_cown<size_t>(n);
+    verona::cpp::when(c) << [](auto c) { busy_loop(*c); };
+
+    Scheduler::get().run();
   }
 }

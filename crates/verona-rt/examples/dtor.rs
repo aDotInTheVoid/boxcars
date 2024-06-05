@@ -1,4 +1,4 @@
-use verona_rt::CownPtr;
+use verona_rt::Cown;
 
 struct Foo;
 
@@ -11,7 +11,7 @@ impl Drop for Foo {
 fn main() {
     verona_rt::with_scheduler(|| {
         dbg!();
-        let foo = CownPtr::new(Foo);
+        let foo = Cown::new(Foo);
         let f2 = foo.clone();
         dbg!();
         drop(f2);

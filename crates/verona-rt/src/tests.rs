@@ -1,6 +1,6 @@
 use std::ops;
 
-use crate::{when, with_scheduler, CownPtr};
+use crate::{when, with_scheduler, Cown};
 
 struct Account {
     balance: u64,
@@ -23,7 +23,7 @@ fn list1() {
 
     acc1.balance -= 100;
 
-    let mut acc2 = CownPtr::new(Account::create());
+    let mut acc2 = Cown::new(Account::create());
     /*
     error[E0609]: no field `balance` on type `CownPtr<Account>`
       --> crates/verona-rt/examples/list-1.rs:18:10
@@ -36,14 +36,14 @@ fn list1() {
 
 #[test]
 fn list2() {
-    fn transfer(src: &CownPtr<Account>, dst: &CownPtr<Account>, amount: u64) {
+    fn transfer(src: &Cown<Account>, dst: &Cown<Account>, amount: u64) {
         when(src, move |mut src| src.balance -= amount);
         when(dst, move |mut dst| dst.balance += amount);
     }
 
     with_scheduler(|| {
-        let a1 = CownPtr::new(Account::create());
-        let a2 = CownPtr::new(Account::create());
+        let a1 = Cown::new(Account::create());
+        let a2 = Cown::new(Account::create());
 
         transfer(&a1, &a2, 100);
 
@@ -56,7 +56,7 @@ fn list2() {
 
 #[test]
 fn list3() {
-    fn transfer(src: CownPtr<Account>, dst: CownPtr<Account>, amount: u64) {
+    fn transfer(src: Cown<Account>, dst: Cown<Account>, amount: u64) {
         when(&src, move |mut src| {
             if src.balance >= amount {
                 src.balance -= amount;
@@ -66,8 +66,8 @@ fn list3() {
     }
 
     with_scheduler(|| {
-        let src = CownPtr::new(Account::create());
-        let dst = CownPtr::new(Account::create());
+        let src = Cown::new(Account::create());
+        let dst = Cown::new(Account::create());
 
         transfer(src.clone(), dst.clone(), 100);
 
@@ -82,7 +82,7 @@ fn list3() {
 
 #[test]
 fn list4() {
-    fn transfer(src: CownPtr<Account>, dst: CownPtr<Account>, amount: u64) {
+    fn transfer(src: Cown<Account>, dst: Cown<Account>, amount: u64) {
         when(&src, move |mut src| {
             if src.balance >= amount {
                 src.balance -= amount;
@@ -92,8 +92,8 @@ fn list4() {
     }
 
     with_scheduler(|| {
-        let src = CownPtr::new(Account::create());
-        let dst = CownPtr::new(Account::create());
+        let src = Cown::new(Account::create());
+        let dst = Cown::new(Account::create());
 
         transfer(src.clone(), dst.clone(), 1);
         transfer(dst.clone(), src.clone(), 2);
@@ -107,7 +107,7 @@ fn list4() {
 
 #[test]
 fn list5() {
-    fn transfer(src: &CownPtr<Account>, dst: &CownPtr<Account>, amount: u64) {
+    fn transfer(src: &Cown<Account>, dst: &Cown<Account>, amount: u64) {
         when((src, dst), move |(mut src, mut dst)| {
             if src.balance >= amount && !src.frozen && !dst.frozen {
                 src.balance -= amount;
@@ -117,8 +117,8 @@ fn list5() {
     }
 
     with_scheduler(|| {
-        let src = CownPtr::new(Account::create());
-        let dst = CownPtr::new(Account::create());
+        let src = Cown::new(Account::create());
+        let dst = Cown::new(Account::create());
         transfer(&src, &dst, 100);
 
         when((&src, &dst), |(src, dst)| {
@@ -128,8 +128,8 @@ fn list5() {
     });
 
     with_scheduler(|| {
-        let src = CownPtr::new(Account::create());
-        let dst = CownPtr::new(Account::create());
+        let src = Cown::new(Account::create());
+        let dst = Cown::new(Account::create());
 
         when(&dst, |mut dst| dst.frozen = true);
 
@@ -144,7 +144,7 @@ fn list5() {
 
 #[test]
 fn list6() {
-    fn transfer(src: &CownPtr<Account>, dst: &CownPtr<Account>, amount: u64) {
+    fn transfer(src: &Cown<Account>, dst: &Cown<Account>, amount: u64) {
         when((src, dst), move |(mut src, mut dst)| {
             if src.balance >= amount && !src.frozen && !dst.frozen {
                 src.balance -= amount;
@@ -154,9 +154,9 @@ fn list6() {
     }
 
     with_scheduler(|| {
-        let s1 = CownPtr::new(Account::create());
-        let s2 = CownPtr::new(Account::create());
-        let s4 = CownPtr::new(Account::create());
+        let s1 = Cown::new(Account::create());
+        let s2 = Cown::new(Account::create());
+        let s4 = Cown::new(Account::create());
 
         transfer(&s1, &s2, 10);
         transfer(&s2, &s4, 20);
@@ -171,7 +171,7 @@ fn list6() {
 
 #[test]
 fn list7() {
-    fn transfer(src: &CownPtr<Account>, dst: &CownPtr<Account>, amount: u64) {
+    fn transfer(src: &Cown<Account>, dst: &Cown<Account>, amount: u64) {
         when((src, dst), move |(mut src, mut dst)| {
             if src.balance >= amount && !src.frozen && !dst.frozen {
                 src.balance -= amount;
@@ -181,10 +181,10 @@ fn list7() {
     }
 
     with_scheduler(|| {
-        let s1 = CownPtr::new(Account::create());
-        let s2 = CownPtr::new(Account::create());
-        let s3 = CownPtr::new(Account::create());
-        let s4 = CownPtr::new(Account::create());
+        let s1 = Cown::new(Account::create());
+        let s2 = Cown::new(Account::create());
+        let s3 = Cown::new(Account::create());
+        let s4 = Cown::new(Account::create());
 
         transfer(&s1, &s2, 10);
         transfer(&s3, &s4, 20);
@@ -204,10 +204,10 @@ fn list8() {
 
     #[allow(unused_must_use)]
     with_scheduler(|| {
-        let src = CownPtr::new(());
-        let dst = CownPtr::new(());
+        let src = Cown::new(());
+        let dst = Cown::new(());
 
-        let log = CownPtr::new(tx);
+        let log = Cown::new(tx);
 
         when(&log, |log| {
             log.send("begin");
@@ -259,19 +259,19 @@ fn dining_philosophers() {
             assert_eq!(self.uses, HUNGER * 2);
         }
     }
-    fn get_left(forks: &[CownPtr<Fork>], index: usize) -> CownPtr<Fork> {
+    fn get_left(forks: &[Cown<Fork>], index: usize) -> Cown<Fork> {
         forks[index].clone()
     }
-    fn get_right(forks: &[CownPtr<Fork>], index: usize) -> CownPtr<Fork> {
+    fn get_right(forks: &[Cown<Fork>], index: usize) -> Cown<Fork> {
         forks[(index + 1) % NUM_PHILOSOPHERS].clone()
     }
     struct Philosopher {
-        left: CownPtr<Fork>,
-        right: CownPtr<Fork>,
+        left: Cown<Fork>,
+        right: Cown<Fork>,
         hunger: usize,
     }
     impl Philosopher {
-        fn new(forks: &[CownPtr<Fork>], index: usize) -> Self {
+        fn new(forks: &[Cown<Fork>], index: usize) -> Self {
             Self {
                 left: get_left(forks, index),
                 right: get_right(forks, index),
@@ -297,7 +297,7 @@ fn dining_philosophers() {
     with_scheduler(|| {
         let mut forks = Vec::new();
         for _ in 0..NUM_PHILOSOPHERS {
-            forks.push(CownPtr::new(Fork::default()));
+            forks.push(Cown::new(Fork::default()));
         }
         for i in 0..NUM_PHILOSOPHERS {
             let p = Philosopher::new(&forks, i);

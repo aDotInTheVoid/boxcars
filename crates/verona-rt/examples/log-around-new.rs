@@ -1,4 +1,4 @@
-use verona_rt::{log, with_leak_detector, CownPtr};
+use verona_rt::{log, with_leak_detector, Cown};
 
 // cargo run --example log-around-new --features systematic_testing,snmalloc_tracing
 // RUSTFLAGS=-Zsanitizer=address cargo +nightly run --example log-around-new --features asan
@@ -12,7 +12,7 @@ fn main() {
     with_leak_detector(|| {
         log(c"TOP");
 
-        let c1 = CownPtr::new(101);
+        let c1 = Cown::new(101);
 
         log(c"made allocation, now droping");
 

@@ -1,5 +1,5 @@
 use verona_rt::with_leak_detector;
-use verona_rt::CownPtr;
+use verona_rt::Cown;
 
 use std::mem;
 
@@ -14,7 +14,7 @@ use std::mem;
 )]
 fn leak_detector_works() {
     with_leak_detector(|| {
-        let v = CownPtr::new(666);
+        let v = Cown::new(666);
         mem::forget(v);
     });
 }

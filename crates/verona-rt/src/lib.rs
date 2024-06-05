@@ -67,7 +67,7 @@ mod when;
 #[cfg(test)]
 mod tests;
 
-pub use cown::CownPtr;
+pub use cown::Cown;
 pub use log::{log, log_snmalloc};
 pub use scheduler::{with as with_scheduler, with_leak_detector};
 pub use variadic_when::{when, CownCollection};

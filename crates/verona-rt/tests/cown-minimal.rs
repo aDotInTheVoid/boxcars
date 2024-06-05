@@ -1,4 +1,4 @@
-use verona_rt::CownPtr;
+use verona_rt::Cown;
 
 #[test]
 fn main() {
@@ -7,7 +7,7 @@ fn main() {
     }
 
     verona_rt::with_scheduler(|| {
-        let v1 = CownPtr::new(101);
+        let v1 = Cown::new(101);
         drop(v1);
     });
 }

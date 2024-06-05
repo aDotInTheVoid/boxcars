@@ -10,6 +10,10 @@ pub struct CownPtr<T> {
     _marker: PhantomData<T>,
 }
 
+// https://doc.rust-lang.org/1.78.0/src/std/sync/mutex.rs.html#187
+unsafe impl<T: Send> Send for CownPtr<T> {}
+unsafe impl<T: Send> Sync for CownPtr<T> {}
+
 #[repr(C)]
 pub(crate) struct CownData<T> {
     // Must be first, so we can convert pointers between the two.

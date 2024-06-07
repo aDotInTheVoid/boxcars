@@ -1,6 +1,6 @@
 use verona_rt_sys as ffi;
 
-use verona_rt::{log, with_scheduler, CownPtr};
+use verona_rt::{log, with_scheduler, Cown};
 
 fn main() {
     unsafe {
@@ -10,7 +10,7 @@ fn main() {
 
     with_scheduler(|| {
         log(c"TOP");
-        let v1 = CownPtr::new(10);
+        let v1 = Cown::new(10);
         log(c"Just alloced");
         let v2 = v1.clone();
         log(c"Just cloned");

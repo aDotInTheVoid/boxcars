@@ -1,4 +1,4 @@
-use crate::{AcquiredCown, CownPtr};
+use crate::{AcquiredCown, Cown};
 
 pub trait CownCollection {
     type Acquired<'a>;
@@ -25,7 +25,7 @@ macro_rules! impl_collection_once {
         >
     ) => {
         #[allow(unused_parens)]
-        impl<$($gty: 'static),+> CownCollection for ($(&CownPtr<$gty>),+) {
+        impl<$($gty: 'static),+> CownCollection for ($(&Cown<$gty>),+) {
             type Acquired<'a> = ($(AcquiredCown<'a, $gty>),+);
 
             fn schedule_onto<Func>(self, func: Func)
@@ -67,9 +67,9 @@ mod tests {
     #[test]
     fn playing_around() {
         with_leak_detector(|| {
-            let c1 = CownPtr::new(1);
-            let c2 = CownPtr::new(3);
-            let c5 = CownPtr::new(8);
+            let c1 = Cown::new(1);
+            let c2 = Cown::new(3);
+            let c5 = Cown::new(8);
 
             when((&c1, &c2, &c5), |(mut a, b, mut c)| {
                 assert_eq!(*a, 1);
@@ -91,9 +91,9 @@ mod tests {
     fn lambda() {
         with_leak_detector(|| {
             let x = Arc::new(AtomicI16::new(10));
-            let c1 = CownPtr::new(10);
-            let c2 = CownPtr::new(20);
-            let c3 = CownPtr::new(30);
+            let c1 = Cown::new(10);
+            let c2 = Cown::new(20);
+            let c3 = Cown::new(30);
 
             let x_ = x.clone();
             when((&c1, &c2), move |(a1, a2)| {

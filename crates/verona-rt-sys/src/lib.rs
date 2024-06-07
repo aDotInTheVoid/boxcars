@@ -105,7 +105,7 @@ extern "C" {
     pub fn boxcars_allocate_cown(descriptor: &'static Descriptor) -> CownPtr;
 
     pub fn enable_logging();
-    pub fn dump_flight_recorder();
+    pub fn boxcars_dump_flight_recorder();
 
     pub fn boxcars_sched_lambda(
         n_cowns: usize,

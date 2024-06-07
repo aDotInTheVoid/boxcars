@@ -1,4 +1,4 @@
-use verona_rt::{with_leak_detector, CownPtr};
+use verona_rt::{with_leak_detector, Cown};
 
 #[test]
 fn main() {
@@ -9,7 +9,7 @@ fn main() {
                     let mut v = Vec::new();
 
                     for i in 0..100 {
-                        v.push(CownPtr::new(i));
+                        v.push(Cown::new(i));
                     }
 
                     let mut vs = Vec::new();

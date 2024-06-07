@@ -4,11 +4,15 @@ use verona_rt_sys as ffi;
 
 use crate::descriptor::get_desc;
 
-pub struct CownPtr<T> {
+pub struct Cown<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
     // TODO: Is this right wrt send/sync.
     _marker: PhantomData<T>,
 }
+
+// https://doc.rust-lang.org/1.78.0/src/std/sync/mutex.rs.html#187
+unsafe impl<T: Send> Send for Cown<T> {}
+unsafe impl<T: Send> Sync for Cown<T> {}
 
 #[repr(C)]
 pub(crate) struct CownData<T> {
@@ -26,7 +30,7 @@ pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
     unsafe { ptr::addr_of_mut!((*p).data) }
 }
 
-impl<T> CownPtr<T> {
+impl<T> Cown<T> {
     fn data_ptr(&self) -> *mut T {
         cown_to_data(self.cown_ptr.addr())
     }
@@ -37,19 +41,19 @@ impl<T> CownPtr<T> {
     }
 }
 
-impl<T> fmt::Pointer for CownPtr<T> {
+impl<T> fmt::Pointer for Cown<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Pointer::fmt(&self.cown_ptr.addr(), f)
     }
 }
 
-impl<T> core::ops::Drop for CownPtr<T> {
+impl<T> core::ops::Drop for Cown<T> {
     fn drop(&mut self) {
         unsafe { ffi::boxcars_release_object(self.cown_ptr) };
     }
 }
 
-impl<T> Clone for crate::cown::CownPtr<T> {
+impl<T> Clone for crate::cown::Cown<T> {
     fn clone(&self) -> Self {
         unsafe {
             ffi::boxcars_acquire_object(self.cown_ptr);
@@ -61,7 +65,7 @@ impl<T> Clone for crate::cown::CownPtr<T> {
     }
 }
 
-impl<T> CownPtr<T> {
+impl<T> Cown<T> {
     /// Must be inside a runtime.
     // TODO: Enforce that.
     pub fn new(value: T) -> Self {
@@ -91,7 +95,7 @@ mod tests {
     #[test]
     fn new() {
         with_leak_detector(|| {
-            let v = CownPtr::new(10);
+            let v = Cown::new(10);
             let v2 = v.clone();
             assert_eq!(v.cown_ptr.addr(), v2.cown_ptr.addr());
             drop(v);
@@ -103,14 +107,14 @@ mod tests {
     #[test]
     fn new_minimal() {
         with(|| {
-            CownPtr::new(10);
+            Cown::new(10);
         })
     }
 
     #[test]
     fn clone_minimal() {
         with(|| {
-            let v1 = CownPtr::new(42);
+            let v1 = Cown::new(42);
             _ = v1.clone();
         })
     }
@@ -118,7 +122,7 @@ mod tests {
     #[test]
     fn clone_notnull() {
         with(|| {
-            let v1 = CownPtr::new(10);
+            let v1 = Cown::new(10);
             let v2 = v1.clone();
             assert_ne!(v2.cown_ptr.addr(), ptr::null_mut());
         })
@@ -131,7 +135,7 @@ mod tests {
         }
 
         with_leak_detector(|| {
-            let x = CownPtr::new(1010);
+            let x = Cown::new(1010);
             let y = x.clone();
             drop(x);
             drop(y);
@@ -141,7 +145,7 @@ mod tests {
     #[test]
     fn read_modify_write() {
         scheduler::with_leak_detector(|| {
-            let mut c = CownPtr::new([0; 100]);
+            let mut c = Cown::new([0; 100]);
             assert_ne!(c.cown_ptr.addr(), ptr::null_mut());
             {
                 let c = unsafe { c.yolo_data() };
@@ -174,7 +178,7 @@ mod tests {
     #[test]
     fn write_stress() {
         fn stress_once<const N: usize>() {
-            let mut x = CownPtr::new([0u8; N]);
+            let mut x = Cown::new([0u8; N]);
 
             unsafe {
                 for i in x.yolo_data() {
@@ -233,7 +237,7 @@ mod tests {
     fn dtor() {
         scheduler::with(|| {
             let flag = Cell::new(false);
-            let cown = CownPtr::new(WriteOnDrop(&flag));
+            let cown = Cown::new(WriteOnDrop(&flag));
 
             assert_eq!(flag.get(), false);
             drop(cown);
@@ -245,7 +249,7 @@ mod tests {
     fn dtor_clone() {
         scheduler::with(|| {
             let flag = Cell::new(false);
-            let cown = CownPtr::new(WriteOnDrop(&flag));
+            let cown = Cown::new(WriteOnDrop(&flag));
 
             assert_eq!(flag.get(), false);
             let cown2 = cown.clone();

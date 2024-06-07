@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use verona_rt::log_snmalloc;
-use verona_rt::{with_leak_detector, CownPtr};
+use verona_rt::{with_leak_detector, Cown};
 
 // RUSTFLAGS='--cfg slow_tests' cargo test --all
 #[cfg(slow_tests)]
@@ -32,7 +32,7 @@ fn one_run() {
                         let mut v = Vec::new();
 
                         for i in 0..100 {
-                            v.push(CownPtr::new(i));
+                            v.push(Cown::new(i));
                         }
 
                         let mut vs = Vec::new();

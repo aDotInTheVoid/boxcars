@@ -6,10 +6,9 @@
 #include <stdint.h>
 #include <string_view>
 // verona
-#include <cpp/lambdabehaviour.h>
-#include <object/object.h>
-#include <sched/cown.h>
-#include <sched/schedulerthread.h>
+#include <cpp/when.h>
+#include <debug/harness.h>
+#include <verona.h>
 
 using verona::rt::Behaviour;
 using verona::rt::BehaviourCore;
@@ -20,9 +19,54 @@ using verona::rt::Scheduler;
 using verona::rt::Slot;
 using verona::rt::Work;
 
+using verona::cpp::cown_ptr;
+using verona::cpp::make_cown;
+using verona::cpp::when;
+
 // Sane Rust platform assumptions.
 static_assert(sizeof(void*) == sizeof(size_t));
 static_assert(sizeof(void*) == sizeof(ptrdiff_t));
+
+namespace bench
+{
+  uint32_t sequential_fib(uint32_t n)
+  {
+    if (n <= 1)
+      return n;
+    else
+      return sequential_fib(n - 1) + sequential_fib(n - 2);
+  }
+
+  void parallel_fib_into(uint32_t n, cown_ptr<uint32_t> result)
+  {
+    if (n <= 4)
+    {
+      when(result) << [n](auto r) { *r = sequential_fib(n); };
+    }
+    else
+    {
+      auto f1 = make_cown<uint32_t>(0);
+      parallel_fib_into(n - 1, f1);
+      parallel_fib_into(n - 2, result);
+      when(result, f1) << [](auto r, auto f) { *r += f; };
+    }
+  }
+
+  void parallel_fib_into_carefull(uint32_t n, cown_ptr<uint32_t>& result)
+  {
+    if (n <= 4)
+    {
+      when(result) << [n](auto r) { *r = sequential_fib(n); };
+    }
+    else
+    {
+      auto f1 = make_cown<uint32_t>(0);
+      parallel_fib_into_carefull(n - 1, f1);
+      parallel_fib_into_carefull(n - 2, result);
+      when(result, f1) << [](auto r, auto f) { *r += f; };
+    }
+  }
+}
 
 extern "C"
 {
@@ -125,7 +169,7 @@ extern "C"
   {
     Logging::cout() << p;
   }
-  void dump_flight_recorder()
+  void boxcars_dump_flight_recorder()
   {
     Logging::SysLog::dump_flight_recorder();
   }
@@ -238,5 +282,92 @@ extern "C"
 #ifdef SNMALLOC_TRACING
     snmalloc::message<1024>("{}", s);
 #endif
+  }
+
+  void boxcars_busy_loop(size_t usecs)
+  {
+    busy_loop(usecs);
+  }
+
+  // TODO: Don't put these in main binary
+  void bbench_create_n_cowns(size_t n)
+  {
+    std::vector<cown_ptr<size_t>> v;
+    v.reserve(n);
+
+    for (int i = 0; i < n; i++)
+    {
+      v.push_back(make_cown<size_t>(i));
+    }
+  }
+
+  void bbench_busyloop_inside_when(size_t nsecs, uint64_t iters)
+  {
+    Scheduler::get().init(1);
+
+    auto c = make_cown<size_t>(nsecs);
+
+    for (int i = 0; i < iters; i++)
+    {
+      when(c) << [](auto c) { busy_loop(*c); };
+    }
+
+    Scheduler::get().run();
+  }
+
+  void bbench_schedule_n_lambdas_onto_cown(size_t n, uint64_t iters)
+  {
+    Scheduler::get().init(1);
+
+    auto threader = make_cown<int>(0);
+
+    for (int i = 0; i < iters; i++)
+    {
+      auto c = make_cown<int>(0);
+      for (int j = 0; j < n; j++)
+      {
+        when(c) << [](auto c) { c++; };
+      }
+
+      when(c, threader) << [](auto, auto) {};
+    }
+
+    Scheduler::get().run();
+  }
+
+  void bbench_do_par_fib(uint32_t n, uint32_t exp, uint64_t iters)
+  {
+    Scheduler::get().init(1);
+
+    auto r = make_cown<uint32_t>(0);
+
+    for (int i = 0; i < iters; i++)
+    {
+      bench::parallel_fib_into(n, r);
+      when(r) << [exp](auto r) {
+        if (r != exp)
+          abort();
+      };
+    }
+
+    Scheduler::get().run();
+  }
+
+  void bbench_do_par_fib_carefull(uint32_t n, uint32_t exp, uint64_t iters)
+  {
+    Scheduler::get().init(1);
+
+    auto r = make_cown<uint32_t>(0);
+
+    for (int i = 0; i < iters; i++)
+    {
+      bench::parallel_fib_into_carefull(n, r);
+      when(r) << [exp](auto r) {
+        if (r != exp)
+          abort();
+      };
+    }
+
+    Scheduler::get().run();
   }
 }

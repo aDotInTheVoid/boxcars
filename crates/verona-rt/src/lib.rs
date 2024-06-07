@@ -1,8 +1,8 @@
 //! ```rust
 //! # use verona_rt::*;
 //! # with_scheduler(|| {
-//! let string = CownPtr::new(String::new());
-//! let vec = CownPtr::new(Vec::<i32>::new());
+//! let string = Cown::new(String::new());
+//! let vec = Cown::new(Vec::<i32>::new());
 //!
 //! when(&string, |mut s| {
 //!     assert_eq!(&*s, "");
@@ -64,7 +64,10 @@ mod scheduler;
 mod variadic_when;
 mod when;
 
-pub use cown::CownPtr;
+#[cfg(test)]
+mod tests;
+
+pub use cown::Cown;
 pub use log::{log, log_snmalloc};
 pub use scheduler::{with as with_scheduler, with_leak_detector};
 pub use variadic_when::{when, CownCollection};

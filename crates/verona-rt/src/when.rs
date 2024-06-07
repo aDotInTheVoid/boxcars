@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use verona_rt_sys as ffi;
 
-use crate::cown::CownPtr;
+use crate::cown::Cown;
 
 pub struct AcquiredCown<'a, T> {
     // TODO: As an optimization, point to the `T`, and roll the pointer back to
@@ -61,7 +61,7 @@ macro_rules! one_when {
     ) => {
         pub fn $whenfunc
             <Func, $($gty : 'static ),+>
-        ($($cname: &CownPtr<$gty>),+, func: Func)
+        ($($cname: &Cown<$gty>),+, func: Func)
             where
                 Func: for <$($glife),+> FnOnce( $(AcquiredCown<$glife, $gty>),+)
                     + Send + 'static
@@ -121,7 +121,7 @@ mod tests {
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
         scheduler::with(|| {
-            let v = CownPtr::new(101);
+            let v = Cown::new(101);
             when1(&v, |mut v| {
                 assert_eq!(*v, 101);
                 *v += 1;
@@ -143,8 +143,8 @@ mod tests {
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
         scheduler::with(|| {
-            let v1 = CownPtr::new(1);
-            let v2 = CownPtr::new(2);
+            let v1 = Cown::new(1);
+            let v2 = Cown::new(2);
             when2(&v1, &v2, |a1, a2| {
                 assert_eq!(*a1, 1);
                 assert_eq!(*a2, 2);
@@ -165,7 +165,7 @@ mod tests {
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
         scheduler::with(|| {
-            let vec_cown = CownPtr::new(vec![1, 2, 3]);
+            let vec_cown = Cown::new(vec![1, 2, 3]);
 
             when1(&vec_cown, |mut v| {
                 assert_eq!(*v, &[1, 2, 3]);
@@ -193,8 +193,8 @@ mod tests {
     #[test]
     fn when_two() {
         scheduler::with(|| {
-            let string = CownPtr::new(String::new());
-            let vec = CownPtr::new(Vec::new());
+            let string = Cown::new(String::new());
+            let vec = Cown::new(Vec::new());
 
             when1(&string, |mut s| {
                 assert_eq!(&*s, "");
@@ -220,7 +220,7 @@ mod tests {
     #[ignore = "Panics with schedular lock don't work, see #16"]
     fn double_acquire() {
         scheduler::with(|| {
-            let c1 = CownPtr::new(10);
+            let c1 = Cown::new(10);
             let c2 = c1.clone();
             when2(&c1, &c2, |_, _| loop {});
         })
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn fmt_acquired() {
         scheduler::with(|| {
-            let x = CownPtr::new("101");
+            let x = Cown::new("101");
             when1(&x, |x| {
                 assert_eq!(*x, "101");
                 assert_eq!(format!("{x}"), "101");
@@ -245,9 +245,9 @@ mod tests {
         let bars_ = Arc::clone(&bars);
 
         let in_sched = move || {
-            let c_main = CownPtr::new(droptrack);
+            let c_main = Cown::new(droptrack);
 
-            let c_bars = CownPtr::new(bars_);
+            let c_bars = Cown::new(bars_);
 
             // t0
             when2(&c_main, &c_bars, |_, bars| {
@@ -291,9 +291,9 @@ mod tests {
         let is_droped = move || *dropstate.lock().unwrap();
 
         let in_sched = || {
-            let c_main = CownPtr::new(droptrack);
+            let c_main = Cown::new(droptrack);
 
-            let c_bars = CownPtr::new(bars_);
+            let c_bars = Cown::new(bars_);
 
             // t0
             when2(&c_main, &c_bars, |m, bars| {
@@ -332,15 +332,15 @@ mod tests {
     #[test]
     fn many_airety() {
         with_leak_detector(|| {
-            let c0 = CownPtr::new(0);
-            let c1 = CownPtr::new(1);
-            let c2 = CownPtr::new(2);
-            let c3 = CownPtr::new(3);
-            let c4 = CownPtr::new(4);
-            let c5 = CownPtr::new(5);
-            let c6 = CownPtr::new(6);
-            let c7 = CownPtr::new(7);
-            let c8 = CownPtr::new(8);
+            let c0 = Cown::new(0);
+            let c1 = Cown::new(1);
+            let c2 = Cown::new(2);
+            let c3 = Cown::new(3);
+            let c4 = Cown::new(4);
+            let c5 = Cown::new(5);
+            let c6 = Cown::new(6);
+            let c7 = Cown::new(7);
+            let c8 = Cown::new(8);
 
             when9(
                 &c0,
@@ -446,7 +446,7 @@ mod tests {
             let shared = Arc::new(Mutex::new(10));
             let shared2 = Arc::clone(&shared);
 
-            let cown = CownPtr::new(1);
+            let cown = Cown::new(1);
 
             when1(&cown, move |mut s| {
                 assert_eq!(*s, 1);

@@ -1,9 +1,10 @@
 gather:
     ./gather_imgs.sh
 
-report_html: gather
+html: report_html
+report_html:
     pandoc report.md -so report.html
 
 pdf: report_pdf
-report_pdf: gather
+report_pdf:
     pandoc report.md -o report.pdf

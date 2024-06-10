@@ -1,6 +1,7 @@
 // TODO: Include what you use.
 // std
 #include <array>
+#include <float.h>
 #include <ostream>
 #include <stddef.h>
 #include <stdint.h>
@@ -19,6 +20,7 @@ using verona::rt::Scheduler;
 using verona::rt::Slot;
 using verona::rt::Work;
 
+using verona::cpp::acquired_cown;
 using verona::cpp::cown_ptr;
 using verona::cpp::make_cown;
 using verona::cpp::when;
@@ -65,6 +67,132 @@ namespace bench
       parallel_fib_into_carefull(n - 2, result);
       when(result, f1) << [](auto r, auto f) { *r += f; };
     }
+  }
+
+  // https://github.com/ic-slurp/verona-benchmarks/blob/4238a9e0217495af95caf361fe9829bb82cca581/util/random.h#L20C1-L34C3
+  struct SimpleRand /*: public Random */
+  {
+    uint64_t value;
+
+    SimpleRand(uint64_t x) : value(x) {}
+
+    uint64_t next()
+    {
+      return nextLong();
+    }
+
+    uint64_t nextLong()
+    {
+      return std::exchange(value, ((value * 1309) + 13849) & 65535);
+    }
+
+    uint32_t nextInt()
+    {
+      return nextInt(0);
+    }
+
+    uint32_t nextInt(uint32_t max)
+    {
+      return max == 0 ? uint32_t(nextLong()) : (uint32_t(nextLong()) % max);
+    }
+
+    double nextDouble()
+    {
+      return double(1.0 / (nextLong() + 1));
+    }
+  };
+
+  // https://github.com/ic-slurp/verona-benchmarks/blob/4238a9e0217495af95caf361fe9829bb82cca581/savina/boc/concurrency/banking.h#L18
+  namespace banking
+  {
+
+    using verona::cpp::acquired_cown;
+
+    struct Account
+    {
+      double balance;
+
+      Account(double balance) : balance(balance) {}
+
+      void debit(double amount)
+      {
+        balance -= amount;
+      }
+
+      void credit(double amount)
+      {
+        balance += amount;
+      }
+    };
+
+    struct Teller
+    {
+      double initial_balance;
+      uint64_t transactions;
+      SimpleRand random;
+      uint64_t completed;
+      std::vector<cown_ptr<Account>> accounts;
+
+      Teller(
+        double initial_balance, uint64_t num_accounts, uint64_t transactions)
+      : initial_balance(initial_balance),
+        transactions(transactions),
+        random(SimpleRand(123456)),
+        completed(0)
+
+      {
+        for (uint64_t i = 0; i < num_accounts; i++)
+        {
+          accounts.emplace_back(make_cown<Account>(initial_balance));
+        }
+      }
+
+      static void spawn_transactions(const cown_ptr<Teller>& self)
+      {
+        when(self) << [tag = self](acquired_cown<Teller> self) mutable {
+          for (uint64_t i = 0; i < self->transactions; i++)
+          {
+            // Randomly pick source and destination account
+            uint64_t source;
+            uint64_t dest;
+
+            do
+            { // changed from actors to avoid deadlock from aliasing
+              source = self->random.nextInt((self->accounts.size() / 10) * 8);
+              dest = self->random.nextInt(self->accounts.size() - source);
+            } while (source == dest);
+
+            if (dest == 0)
+              dest++;
+
+            const cown_ptr<Account>& src = self->accounts[source];
+            const cown_ptr<Account>& dst = self->accounts[dest];
+            double amount = self->random.nextDouble() * 1000;
+
+            when(src, dst) << [amount, tag](
+                                acquired_cown<Account> src,
+                                acquired_cown<Account> dst) mutable {
+              src->debit(amount);
+              dst->credit(amount);
+
+              Teller::reply(tag);
+            };
+          }
+        };
+      }
+
+      static void reply(const cown_ptr<Teller>& self)
+      {
+        when(self) << [](acquired_cown<Teller> self) mutable {
+          self->completed++;
+          if (self->completed == self->transactions)
+          {
+            return;
+          }
+        };
+      }
+    };
+
   }
 }
 
@@ -366,6 +494,23 @@ extern "C"
         if (r != exp)
           abort();
       };
+    }
+
+    Scheduler::get().run();
+  }
+
+  void
+  bbench_do_banking(uint64_t acccounts, uint64_t transactions, uint64_t iters)
+  {
+    Scheduler::get().init(1);
+    double initial = DBL_MAX / float(acccounts * transactions);
+
+    auto teller =
+      make_cown<bench::banking::Teller>(initial, acccounts, transactions);
+
+    for (int i = 0; i < iters; i++)
+    {
+      bench::banking::Teller::spawn_transactions(teller);
     }
 
     Scheduler::get().run();

@@ -4,6 +4,9 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use verona_rt::{when, with_scheduler, Cown};
 
+mod banking;
+mod rand;
+
 fn create_n_cowns(n: usize) -> Vec<Cown<usize>> {
     let mut v = Vec::with_capacity(n);
     for _ in 0..n {
@@ -41,6 +44,19 @@ fn busyloop_inside_when(usecs: usize, iters: u64) {
     });
 }
 
+fn do_banking(accounts: u64, transactions: u64, iters: u64) {
+    with_scheduler(|| {
+        let initial = f64::MAX / (accounts * transactions) as f64;
+
+        let teller = banking::Teller::new(initial, accounts, transactions);
+        let teller = Cown::new(teller);
+
+        for _ in 0..iters {
+            banking::Teller::spawn_transactions(&teller);
+        }
+    })
+}
+
 extern "C" {
     fn bbench_create_n_cowns(n: usize);
     fn bbench_schedule_n_lambdas_onto_cown(n: usize, iters: u64);
@@ -49,6 +65,8 @@ extern "C" {
 
     fn bbench_busyloop_inside_when(usecs: usize, iters: u64);
     fn boxcars_busy_loop(usecs: usize);
+
+    fn bbench_do_banking(accounts: u64, transactions: u64, iters: u64);
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -56,6 +74,30 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     time_n_behaviours(c);
     time_busy_loop(c);
     time_fib(c);
+
+    time_banking(c);
+}
+
+fn time_banking(c: &mut Criterion) {
+    let mut group = c.benchmark_group("savina/Banking");
+
+    group.bench_function("Rust", |b| {
+        b.iter_custom(|iters| {
+            let start = Instant::now();
+            do_banking(1000, 50000, iters);
+            start.elapsed()
+        });
+    });
+
+    group.bench_function("C++", |b| {
+        b.iter_custom(|iters| {
+            let start = Instant::now();
+            unsafe {
+                bbench_do_banking(1000, 50000, iters);
+            }
+            start.elapsed()
+        });
+    });
 }
 
 fn time_busy_loop(c: &mut Criterion) {

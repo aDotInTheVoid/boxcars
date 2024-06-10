@@ -349,6 +349,66 @@ namespace bench
 
     void Customer::wait() {}
   }
+
+  namespace philosopher
+  {
+    using std::move;
+
+    struct Table
+    {
+      uint64_t done_eating;
+
+      Table(uint64_t philosophers) : done_eating(philosophers) {}
+
+      static void finished(cown_ptr<Table> self)
+      {
+        when(self) << [](acquired_cown<Table> self) { --(self->done_eating); };
+      }
+    };
+
+    struct Fork
+    {
+      Fork() {}
+    };
+
+    struct Philosopher
+    {
+      size_t id;
+      uint64_t rounds;
+      cown_ptr<Fork> left;
+      cown_ptr<Fork> right;
+      cown_ptr<Table> table;
+
+      Philosopher(
+        size_t id,
+        uint64_t rounds,
+        cown_ptr<Fork> left,
+        cown_ptr<Fork> right,
+        cown_ptr<Table> table)
+      : id(id),
+        rounds(rounds),
+        left(move(left)),
+        right(move(right)),
+        table(move(table))
+      {}
+
+      static void eat(cown_ptr<Philosopher> phil)
+      {
+        when(phil) << [](acquired_cown<Philosopher> phil) {
+          if (--phil->rounds >= 1)
+          {
+            when(phil->left, phil->right)
+              << [](acquired_cown<Fork> left, acquired_cown<Fork> right) {};
+            eat(phil.cown());
+          }
+          else
+          {
+            Table::finished(phil->table);
+          }
+        };
+      }
+    };
+  }
 }
 
 extern "C"
@@ -654,8 +714,7 @@ extern "C"
     Scheduler::get().run();
   }
 
-  void
-  bbench_do_banking(uint64_t acccounts, uint64_t transactions, uint64_t iters)
+  void bbench_do_banking(uint64_t acccounts, uint64_t transactions)
   {
     Scheduler::get().init(1);
     double initial = DBL_MAX / float(acccounts * transactions);
@@ -663,20 +722,13 @@ extern "C"
     auto teller =
       make_cown<bench::banking::Teller>(initial, acccounts, transactions);
 
-    for (int i = 0; i < iters; i++)
-    {
-      bench::banking::Teller::spawn_transactions(teller);
-    }
+    bench::banking::Teller::spawn_transactions(teller);
 
     Scheduler::get().run();
   }
 
   void bbench_do_barber(
-    uint64_t haircuts,
-    uint64_t room,
-    uint64_t production,
-    uint64_t cut,
-    uint64_t iters)
+    uint64_t haircuts, uint64_t room, uint64_t production, uint64_t cut)
   {
     Scheduler::get().init(1);
 
@@ -685,10 +737,30 @@ extern "C"
     cown_ptr<CustomerFactory> cf = make_cown<CustomerFactory>(
       haircuts, make_cown<WaitingRoom>(room, make_cown<Barber>(cut)));
 
-    for (int i = 0; i < iters; i++)
+    CustomerFactory::run(cf, production);
+
+    Scheduler::get().run();
+  }
+
+  void bbench_do_philosopher(uint64_t philosophers, uint64_t rounds)
+  {
+    using namespace bench::philosopher;
+
+    Scheduler::get().init(1);
+
+    cown_ptr<Table> table = make_cown<Table>(philosophers);
+
+    cown_ptr<Fork> first = make_cown<Fork>();
+    cown_ptr<Fork> prev = first;
+    for (uint64_t i = 0; i < philosophers - 1; ++i)
     {
-      CustomerFactory::run(cf, production);
+      cown_ptr<Fork> next = make_cown<Fork>();
+      Philosopher::eat(
+        make_cown<Philosopher>(i, rounds, move(prev), next, table));
+      prev = move(next);
     }
+    Philosopher::eat(make_cown<Philosopher>(
+      philosophers - 1, rounds, move(prev), move(first), move(table)));
 
     Scheduler::get().run();
   }

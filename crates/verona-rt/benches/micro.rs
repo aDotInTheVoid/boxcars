@@ -2,12 +2,15 @@ use std::{hint::black_box, time::Instant};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
+use philosopher::do_phil;
 use verona_rt::{when, with_scheduler, Cown};
 
 #[path = "micro/banking.rs"]
 mod banking;
 #[path = "micro/barber.rs"]
 mod barber;
+#[path = "micro/philosopher.rs"]
+mod philosopher;
 
 fn create_n_cowns(n: usize) -> Vec<Cown<usize>> {
     let mut v = Vec::with_capacity(n);
@@ -46,16 +49,14 @@ fn busyloop_inside_when(usecs: usize, iters: u64) {
     });
 }
 
-fn do_banking(accounts: u64, transactions: u64, iters: u64) {
+fn do_banking(accounts: u64, transactions: u64) {
     with_scheduler(|| {
         let initial = f64::MAX / (accounts * transactions) as f64;
 
         let teller = banking::Teller::new(initial, accounts, transactions);
         let teller = Cown::new(teller);
 
-        for _ in 0..iters {
-            banking::Teller::spawn_transactions(&teller);
-        }
+        banking::Teller::spawn_transactions(&teller);
     })
 }
 
@@ -68,8 +69,9 @@ extern "C" {
     fn bbench_busyloop_inside_when(usecs: usize, iters: u64);
     fn boxcars_busy_loop(usecs: usize);
 
-    fn bbench_do_banking(accounts: u64, transactions: u64, iters: u64);
-    fn bbench_do_barber(haircuts: u64, room: u64, production: u64, cut: u64, iters: u64);
+    fn bbench_do_banking(accounts: u64, transactions: u64);
+    fn bbench_do_barber(haircuts: u64, room: u64, production: u64, cut: u64);
+    fn bbench_do_philosopher(philosophers: u64, rounds: u64);
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -80,25 +82,36 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     time_banking(c);
     time_barber(c);
+
+    time_with_sched(c);
+    time_philosophers(c);
+}
+
+fn time_philosophers(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Philosophers");
+
+    group.bench_function("C++", |b| {
+        b.iter(|| unsafe { bbench_do_philosopher(20, 10000) })
+    });
+
+    group.bench_function("Rust", |b| b.iter(|| do_phil(20, 10000)));
+}
+
+fn time_with_sched(c: &mut Criterion) {
+    c.bench_function("Scheduler", |b| b.iter(|| with_scheduler(|| {})));
 }
 
 fn time_barber(c: &mut Criterion) {
     let mut group = c.benchmark_group("savina/Barber");
 
     group.bench_function("Rust", |b| {
-        b.iter_custom(|iters| {
-            let start = Instant::now();
-            barber::bench_barber(5000, 1000, 1000, 1000, iters);
-            start.elapsed()
+        b.iter(|| {
+            barber::bench_barber(5000, 1000, 1000, 1000);
         });
     });
     group.bench_function("C++", |b| {
-        b.iter_custom(|iters| {
-            let start = Instant::now();
-            unsafe {
-                bbench_do_barber(5000, 1000, 1000, 1000, iters);
-            }
-            start.elapsed()
+        b.iter(|| unsafe {
+            bbench_do_barber(5000, 1000, 1000, 1000);
         })
     });
 }
@@ -107,20 +120,14 @@ fn time_banking(c: &mut Criterion) {
     let mut group = c.benchmark_group("savina/Banking");
 
     group.bench_function("Rust", |b| {
-        b.iter_custom(|iters| {
-            let start = Instant::now();
-            do_banking(1000, 50000, iters);
-            start.elapsed()
+        b.iter(|| {
+            do_banking(1000, 50000);
         });
     });
 
     group.bench_function("C++", |b| {
-        b.iter_custom(|iters| {
-            let start = Instant::now();
-            unsafe {
-                bbench_do_banking(1000, 50000, iters);
-            }
-            start.elapsed()
+        b.iter(|| unsafe {
+            bbench_do_banking(1000, 50000);
         });
     });
 }

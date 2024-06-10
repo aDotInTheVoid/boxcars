@@ -169,7 +169,7 @@ impl Customer {
     }
 }
 
-pub fn bench_barber(haircuts: u64, room: u64, production: u64, cut: u64, iters: u64) {
+pub fn bench_barber(haircuts: u64, room: u64, production: u64, cut: u64) {
     with_scheduler(|| {
         let barber = Cown::new(Barber::new(cut));
 
@@ -177,8 +177,6 @@ pub fn bench_barber(haircuts: u64, room: u64, production: u64, cut: u64, iters: 
 
         let cf = Cown::new(CustomerFactory::new(haircuts, wr));
 
-        for _ in 0..iters {
-            CustomerFactory::run(&cf, production);
-        }
+        CustomerFactory::run(&cf, production);
     });
 }

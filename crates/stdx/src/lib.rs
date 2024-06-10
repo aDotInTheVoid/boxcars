@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+pub mod rand;
 pub mod thread;
 
 pub struct SetOnDrop(pub Arc<Mutex<bool>>);

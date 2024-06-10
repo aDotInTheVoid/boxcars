@@ -1,7 +1,6 @@
 use verona_rt::{when, Cown};
-use verona_rt_sys::CownPtr;
 
-use crate::rand::SimpleRand;
+use stdx::rand::SimpleRand;
 
 struct Account {
     balance: f64,
@@ -20,7 +19,6 @@ impl Account {
 }
 
 pub(crate) struct Teller {
-    initial_balance: f64,
     transactions: u64,
     random: SimpleRand,
     completed: u64,
@@ -36,7 +34,6 @@ impl Teller {
         }
 
         Self {
-            initial_balance,
             transactions,
             completed: 0,
             accounts,

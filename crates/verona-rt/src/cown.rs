@@ -7,7 +7,7 @@ use crate::descriptor::get_desc;
 pub struct Cown<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
     // TODO: Is this right wrt send/sync.
-    _marker: PhantomData<T>,
+    pub(crate) _marker: PhantomData<T>,
 }
 
 // https://doc.rust-lang.org/1.78.0/src/std/sync/mutex.rs.html#187

@@ -4,8 +4,10 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use verona_rt::{when, with_scheduler, Cown};
 
+#[path = "micro/banking.rs"]
 mod banking;
-mod rand;
+#[path = "micro/barber.rs"]
+mod barber;
 
 fn create_n_cowns(n: usize) -> Vec<Cown<usize>> {
     let mut v = Vec::with_capacity(n);
@@ -67,6 +69,7 @@ extern "C" {
     fn boxcars_busy_loop(usecs: usize);
 
     fn bbench_do_banking(accounts: u64, transactions: u64, iters: u64);
+    fn bbench_do_barber(haircuts: u64, room: u64, production: u64, cut: u64, iters: u64);
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -76,6 +79,28 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     time_fib(c);
 
     time_banking(c);
+    time_barber(c);
+}
+
+fn time_barber(c: &mut Criterion) {
+    let mut group = c.benchmark_group("savina/Barber");
+
+    group.bench_function("Rust", |b| {
+        b.iter_custom(|iters| {
+            let start = Instant::now();
+            barber::bench_barber(5000, 1000, 1000, 1000, iters);
+            start.elapsed()
+        });
+    });
+    group.bench_function("C++", |b| {
+        b.iter_custom(|iters| {
+            let start = Instant::now();
+            unsafe {
+                bbench_do_barber(5000, 1000, 1000, 1000, iters);
+            }
+            start.elapsed()
+        })
+    });
 }
 
 fn time_banking(c: &mut Criterion) {

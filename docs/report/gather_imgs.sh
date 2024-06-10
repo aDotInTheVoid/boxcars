@@ -17,3 +17,10 @@ do
     cp "$criterion_dir/$bname/report/lines.svg" "./img/${bname// /_}.svg"
 done
 
+for bname in \
+	'savina_Banking' \
+	'savina_Barber'
+do
+	cp "$criterion_dir/$bname/report/violin.svg" "./img/${bname// / /_}.svg"
+done
+

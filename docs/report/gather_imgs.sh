@@ -20,7 +20,8 @@ done
 
 for bname in \
 	'savina_Banking' \
-	'savina_Barber'
+	'savina_Barber' \
+    'Scheduler'
 do
 	cp "$criterion_dir/$bname/report/violin.svg" "./img/${bname// / /_}.svg"
 done

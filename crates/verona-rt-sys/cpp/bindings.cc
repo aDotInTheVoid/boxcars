@@ -624,7 +624,7 @@ extern "C"
     std::vector<cown_ptr<size_t>> v;
     v.reserve(n);
 
-    for (int i = 0; i < n; i++)
+    for (size_t i = 0; i < n; i++)
     {
       v.push_back(make_cown<size_t>(i));
     }
@@ -749,6 +749,12 @@ extern "C"
     Philosopher::eat(
       make_cown<Philosopher>(rounds, move(prev), move(first), move(table)));
 
+    Scheduler::get().run();
+  }
+
+  void bbench_create_scheduler(void)
+  {
+    Scheduler::get().init(1);
     Scheduler::get().run();
   }
 }

@@ -12,7 +12,8 @@ for bname in \
     'Busy Loop' \
     'Create Cowns' \
     'Fibonacci' \
-    'Schedule Behaviours'
+    'Schedule Behaviours' \
+    'Philosophers'
 do
     cp "$criterion_dir/$bname/report/lines.svg" "./img/${bname// /_}.svg"
 done

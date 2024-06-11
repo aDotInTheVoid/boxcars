@@ -17,7 +17,7 @@ numbersections: true
 
 # Abstract
 
-Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradime [@when_concurrency_matters]. I introduce Rust bindings to the verona-runtime.
+Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm [@when_concurrency_matters]. I introduce Rust bindings to the verona-runtime.
 
 # Acknowledgements
 
@@ -44,7 +44,7 @@ Marios Kogias, Mathiew Parkinson, David Chisnall, Sylvan Clebsch, Mara Bos, Nora
 
 ## Behaviour API
 
-## Schedular
+## Scheduler
 
 # Implementation Chalenges
 
@@ -56,11 +56,11 @@ Marios Kogias, Mathiew Parkinson, David Chisnall, Sylvan Clebsch, Mara Bos, Nora
 
 ## Benchmarks
 
-One important metric to evaluate the project on is performance. As discussed previously (§\ref{design-cowns}), it's not simple to call into the C++ runtime from rust, and I had to be somewhat indirect due to the FFI boundry. I wanted to measure the performance overhead of this, versus C++ code that can call it directly. 
+One important metric to evaluate the project on is performance. As discussed previously (§\ref{design-cowns}), it's not simple to call into the C++ runtime from rust, and I had to be somewhat indirect due to the FFI boundary. I wanted to measure the performance overhead of this, versus C++ code that can call it directly. 
 
 Note: In all benchmarks below, `Rust` indicates using my `boxcars` library, whereas `C++` indicates using the `verona-rt` library directly.
 
-All graphs were created using the excelent [`criterion`](https://github.com/bheisler/criterion.rs) (TODO: Cite?) library.
+All graphs were created using the excellent [`criterion`](https://github.com/bheisler/criterion.rs) (TODO: Cite?) library.
 
 ## Microbenchmarks
 
@@ -93,7 +93,7 @@ for (size_t i = 0; i < n; i++)
 }
 ```
 
-This overhead is measurable, but relativly small, with it only being 0.03ms when creating $2^{15}$ `Cown`s.
+This overhead is measurable, but relatively small, with it only being 0.03ms when creating $2^{15}$ `Cown`s.
 
 ### Scheduling behaviours
 
@@ -103,7 +103,7 @@ This overhead is measurable, but relativly small, with it only being 0.03ms when
 The other major implementation difference is how behaviours are scheduled onto
 the `Cown`s, with Rust also needing indirection over FFI (§\ref{design-behaviours}). Therefor
 I benchmarked scheduling a large number of behaviours that do minimal work, to
-measure the cost of the scheduling and exectution itself.
+measure the cost of the scheduling and execution itself.
 
 As shown, the FFI indirection imposes very little additional overhead over the C++ code which can interact directly with the runtime.
 
@@ -132,7 +132,7 @@ for (int j = 0; j < n; j++)
 **Figure 3: Time to create and run a scheduler doing nothing**
 
 The final thing to consider is how long it takes to set up the global scheduling
-state. Both libraries consistantly take around 300μs to do so. In other
+state. Both libraries consistently take around 300μs to do so. In other
 microbenchmarks, it was important to do this outside the loop being benchmarked,
 to ensure that I was timing the code being benchmarked, and not having the
 overhead of setting up and then tearing down the executors thread and memory
@@ -154,7 +154,7 @@ Scheduler::get().run();
 
 **Figure 4: Time to busy loop for $n$ µsecs**
 
-To do this, I wrote a benchmark that would busy loop for a given lenght of time.
+To do this, I wrote a benchmark that would busy loop for a given length of time.
 This would allow me to know how long a given benchmark "should" take, and
 therefor see if this was replicated in the data.
 
@@ -178,7 +178,7 @@ when(&c, |c| unsafe {
 ## Subjective Things
 
 - Manually Clone.
-- Parial Borrors don't work
+- Partial Borrors don't work
 - C++ allows more expressive ctors `auto foo = make_cown<Foo>(a, b, c)`
 
 ![](./img/Busy_Loop.svg)

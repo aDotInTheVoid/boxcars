@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-
 use verona_rt::{when, with_scheduler, Cown};
 
 use stdx::rand::SimpleRand;
@@ -30,34 +28,26 @@ impl Customer {
         Self { factory }
     }
 
-    // fn full(this: &Cown<Self>) {
-    //     when(this, |this| {
-    //         CustomerFactory::returned(&this.factory, this.cown());
-    //     });
-    // }
-
-    fn sit_down(&self) {
-        //nop
-    }
+    fn sit_down(&self) {}
 }
 
 struct Barber {
-    haircut_rate: u64,
-    busy: bool,
+    haircut_rate: u32,
     random: SimpleRand,
 }
 
 impl Barber {
-    fn new(haircut_rate: u64) -> Self {
+    fn new(haircut_rate: u32) -> Self {
         Self {
             haircut_rate,
-            busy: false,
             random: SimpleRand::default(),
         }
     }
 }
 
-fn busy_waiter(wait: u64, random: &mut SimpleRand) -> u64 {
+#[no_mangle]
+#[inline(never)]
+fn rust_barberwait(wait: u32, random: &mut SimpleRand) -> u32 {
     let mut x = 0;
     for _ in 0..wait {
         random.next();
@@ -95,19 +85,9 @@ impl WaitingRoom {
 
                         customer.sit_down();
 
-                        busy_waiter(
-                            SimpleRand::new(
-                                SystemTime::now()
-                                    .duration_since(SystemTime::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_nanos() as u64,
-                            )
-                            .next_int_with_max(barber.haircut_rate as u32)
-                                as u64
-                                + 10,
-                            &mut barber.random,
-                        );
-
+                        let rate = barber.haircut_rate;
+                        let wait_for = barber.random.next_int_with_max(rate) + 10;
+                        rust_barberwait(wait_for, &mut barber.random);
                         CustomerFactory::left(&customer.factory, customer.cown());
 
                         when((&barber.cown(), &wr), |(_barber, _wr)| {});
@@ -134,7 +114,7 @@ impl CustomerFactory {
 }
 
 impl CustomerFactory {
-    fn run(this: &Cown<CustomerFactory>, rate: u64) {
+    fn run(this: &Cown<CustomerFactory>, rate: u32) {
         when(this, {
             let tag = this.clone();
 
@@ -142,18 +122,7 @@ impl CustomerFactory {
                 for _ in 0..this.number_of_haircuts {
                     this.attempts += 1;
                     WaitingRoom::enter(&this.room, Cown::new(Customer::new(tag.clone())));
-
-                    busy_waiter(
-                        SimpleRand::new(
-                            SystemTime::now()
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .unwrap()
-                                .as_nanos() as u64,
-                        )
-                        .next_int_with_max(rate as u32) as u64
-                            + 10,
-                        &mut this.random,
-                    );
+                    rust_barberwait(this.random.next_int_with_max(rate) + 10, &mut this.random);
                 }
             }
         })
@@ -168,7 +137,7 @@ impl Customer {
     }
 }
 
-pub fn bench_barber(haircuts: u64, room: u64, production: u64, cut: u64) {
+pub fn bench_barber(haircuts: u64, room: u64, production: u32, cut: u32) {
     with_scheduler(|| {
         let barber = Cown::new(Barber::new(cut));
 

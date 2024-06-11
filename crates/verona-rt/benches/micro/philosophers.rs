@@ -1,4 +1,4 @@
-use verona_rt::{when, with_n_threads, with_scheduler, Cown};
+use verona_rt::{when, with_n_threads, Cown};
 
 struct Table {
     done_eating: usize,
@@ -54,7 +54,7 @@ pub fn do_phil(philosophers: usize, rounds: u64, optimal: bool, n_threads: usize
 
         let mut ps = Vec::new();
 
-        for i in 0..(philosophers - 1) {
+        for _ in 0..(philosophers - 1) {
             let next = Cown::new(Fork::default());
             let p = Cown::new(Philosopher {
                 rounds,

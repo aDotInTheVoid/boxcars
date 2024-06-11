@@ -27,6 +27,16 @@ Marios Kogias, Mathiew Parkinson, David Chisnall, Sylvan Clebsch, Mara Bos, Nora
 
 ## Evaluation
 
+
+The 
+
+
+### Subjective Things
+
+- Manually Clone.
+- Parial Borrors don't work
+- C++ allows more expressive ctors `auto foo = make_cown<Foo>(a, b, c)`
+
 ![](./img/Busy_Loop.svg)
 
 ![](./img/Create_Cowns.svg)

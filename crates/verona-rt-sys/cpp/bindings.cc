@@ -212,7 +212,7 @@ namespace bench
         room(std::move(room))
       {}
 
-      static void run(cown_ptr<CustomerFactory>&, uint64_t);
+      static void run(cown_ptr<CustomerFactory>&, uint32_t);
       static void
       returned(const cown_ptr<CustomerFactory>&, cown_ptr<Customer>);
       static void left(const cown_ptr<CustomerFactory>&, cown_ptr<Customer>);
@@ -232,21 +232,21 @@ namespace bench
 
     struct Barber
     {
-      uint64_t haircut_rate;
-      bool busy;
+      uint32_t haircut_rate;
       SimpleRand random;
 
-      Barber(uint64_t haircut_rate) : haircut_rate(haircut_rate) {}
+      Barber(uint32_t haircut_rate) : haircut_rate(haircut_rate) {}
 
       static void
       enter(const cown_ptr<Barber>&, cown_ptr<Customer>, cown_ptr<WaitingRoom>);
     };
 
-    static uint64_t BusyWaiter(uint64_t wait, SimpleRand& random)
+    __attribute__((noinline)) static uint32_t
+    cpp_barberwait(uint32_t wait, SimpleRand& random)
     {
-      uint64_t x = 0;
+      uint32_t x = 0;
 
-      for (uint64_t i = 0; i < wait; ++i)
+      for (uint32_t i = 0; i < wait; ++i)
       {
         random.next();
         x++;
@@ -283,22 +283,15 @@ namespace bench
                                             acquired_cown<Customer> customer) {
               when(wr) << [](acquired_cown<WaitingRoom> wr) { wr->count--; };
 
-              // barber->sleeping = false;
               customer->sit_down();
-              BusyWaiter(
-                SimpleRand(time_point_cast<nanoseconds>(system_clock::now())
-                             .time_since_epoch()
-                             .count())
-                    .nextInt(barber->haircut_rate) +
-                  10,
+              cpp_barberwait(
+                barber->random.nextInt(barber->haircut_rate) + 10,
                 barber->random);
               CustomerFactory::left(customer->factory, customer.cown());
 
-              when(barber.cown(), wr) <<
-                [](
-                  acquired_cown<Barber> barber, acquired_cown<WaitingRoom> wr) {
-                  // barber->sleeping = wr->count == 0;
-                };
+              when(barber.cown(), wr) << [](
+                                           acquired_cown<Barber> barber,
+                                           acquired_cown<WaitingRoom> wr) {};
             };
           }
         };
@@ -322,20 +315,14 @@ namespace bench
         [](acquired_cown<CustomerFactory> self) { self->number_of_haircuts--; };
     }
 
-    void CustomerFactory::run(cown_ptr<CustomerFactory>& self, uint64_t rate)
+    void CustomerFactory::run(cown_ptr<CustomerFactory>& self, uint32_t rate)
     {
       when(self) << [tag = self, rate](acquired_cown<CustomerFactory> self) {
         for (uint64_t i = 0; i < self->number_of_haircuts; ++i)
         {
           self->attempts++;
           WaitingRoom::enter(self->room, make_cown<Customer>(tag));
-          BusyWaiter(
-            SimpleRand(time_point_cast<nanoseconds>(system_clock::now())
-                         .time_since_epoch()
-                         .count())
-                .nextInt(rate) +
-              10,
-            self->random);
+          cpp_barberwait(self->random.nextInt(rate) + 10, self->random);
         }
       };
     }
@@ -728,14 +715,15 @@ extern "C"
   }
 
   void bbench_do_barber(
-    uint64_t haircuts, uint64_t room, uint64_t production, uint64_t cut)
+    uint64_t haircuts, uint64_t room, uint32_t production, uint32_t cut)
   {
     Scheduler::get().init(1);
 
     using namespace bench::barber;
 
-    cown_ptr<CustomerFactory> cf = make_cown<CustomerFactory>(
-      haircuts, make_cown<WaitingRoom>(room, make_cown<Barber>(cut)));
+    auto barber = make_cown<Barber>(cut);
+    auto wr = make_cown<WaitingRoom>(room, std::move(barber));
+    auto cf = make_cown<CustomerFactory>(haircuts, std::move(wr));
 
     CustomerFactory::run(cf, production);
 

@@ -70,7 +70,7 @@ extern "C" {
     fn boxcars_busy_loop(usecs: usize);
 
     fn bbench_do_banking(accounts: u64, transactions: u64);
-    fn bbench_do_barber(haircuts: u64, room: u64, production: u64, cut: u64);
+    fn bbench_do_barber(haircuts: u64, room: u64, production: u32, cut: u32);
     fn bbench_do_philosopher(philosophers: u64, rounds: u64, n_threads: usize);
 }
 

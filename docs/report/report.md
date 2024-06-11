@@ -70,13 +70,20 @@ equivalent actions.
 
 #### Creating Cowns
 
+
+```{=latex}
+\mbox{}\\
+```
+
 ![](./img/Create_Cowns.svg)
+
 **Figure 1: Time to create $n$ cowns**
 
 The first benchmark I wrote was to create a vector of $n$ `Cown`s, and then free them. This was to measure the overhead of Rust not being able to interact directly with the `Cown` constructors, but having to do it via FFI, as discussed previously (§\ref{design-cowns}).
 
 
 ```rust
+// Rust
 let mut v = Vec::with_capacity(n);
 for i in 0..n {
     v.push(Cown::<usize>::new(i));
@@ -84,6 +91,7 @@ for i in 0..n {
 ```
 
 ```c++
+// C++
 std::vector<cown_ptr<size_t>> v;
 v.reserve(n);
 
@@ -97,7 +105,13 @@ This overhead is measurable, but relatively small, with it only being 0.03ms whe
 
 #### Scheduling behaviours
 
+
+```{=latex}
+\mbox{}\\
+```
+
 ![](./img/Schedule_Behaviours.svg)
+
 **Figure 2: Time to schedule and run $n$ behaviours** 
 
 The other major implementation difference is how behaviours are scheduled onto
@@ -108,6 +122,7 @@ measure the cost of the scheduling and execution itself.
 As shown, the FFI indirection imposes very little additional overhead over the C++ code which can interact directly with the runtime.
 
 ```rust
+// Rust
 let c = Cown::new(0);
 for _ in 0..n {
     when(&c, |mut c| {
@@ -117,6 +132,7 @@ for _ in 0..n {
 ```
 
 ```c++
+// C++
 auto c = make_cown<int>(0);
 for (int j = 0; j < n; j++)
 {
@@ -126,6 +142,10 @@ for (int j = 0; j < n; j++)
 
 
 #### Setting up scheduler
+
+```{=latex}
+\mbox{}\\
+```
 
 ![](./img/Scheduler.svg)
 
@@ -139,10 +159,12 @@ overhead of setting up and then tearing down the executors thread and memory
 pool.
 
 ```rust
+// Rust
 with_n_threads(1, || { /* no-op */ })
 ```
 
 ```cpp
+// C++
 Scheduler::get().init(1);
 Scheduler::get().run();
 ```
@@ -150,9 +172,17 @@ Scheduler::get().run();
 
 #### Busy looping
 
+
 ![](./img/Busy_Loop.svg)
 
+
+```{=latex}
+\mbox{}\\
+```
+
+
 **Figure 4: Time to busy loop for $n$ µsecs**
+
 
 To do this, I wrote a benchmark that would busy loop for a given length of time.
 This would allow me to know how long a given benchmark "should" take, and
@@ -163,27 +193,33 @@ loops for $n$ μs (as expected!). As all these times are much shorter than the
 ~300μs time to create the scheduler, this let me verify that my benchmarking was
 only measuring the "work" getting done, and not anything else. 
 
-```cpp
-auto c = make_cown<size_t>(nsecs);    
-when(c) << [](auto c) { busy_loop(*c); };    
-```
-
 ```rust
+// Rust
 let c = Cown::new(usecs);
 when(&c, |c| unsafe {
     boxcars_busy_loop(*c);
 })
 ```
 
+```cpp
+// C++
+auto c = make_cown<size_t>(nsecs);    
+when(c) << [](auto c) { busy_loop(*c); };    
+```
+
 ### Larger Benchmarks
+
+Performance is kind of mixed.
 
 ![](./img/savina_Banking.svg)
 ![](./img/savina_Barber.svg)
 ![](./img/Fibonacci.svg)
 
-## Qualitative Evaluation
+## User Experience
 
-Of course, performance isn't the only thing worth measuring.
+Of course, performance isn't the only thing worth measuring. It's also worth
+considering what it's like to *use* these libraries, and how the language and
+API differences impact what it's like to write BoC code in them.
 
 ### Parial Borrows
 
@@ -562,6 +598,53 @@ The root of the problem is that you need to borrow these `Cown`s to form a
 can't say what type it needs to be, only that it must implement a certain trait.
 This also causes a followup error, where it claims that the function has the
 wrong signature, because it can't find the correct one.
+
+### auto-copy vs explicit clone.
+
+In C++, the `cown_ptr` class overloads it's copy and assignment constructor to automaticly update the reference count:
+
+```c++
+// class cown_ptr {
+
+// Copy an existing cown ptr.  Shares the underlying cown.
+cown_ptr(const cown_ptr& other)
+{
+    allocated_cown = other.allocated_cown;
+    if (allocated_cown != nullptr)
+        verona::rt::Cown::acquire(allocated_cown);
+}
+
+// Copy an existing cown ptr.  Shares the underlying cown.
+cown_ptr& operator=(const cown_ptr& other)
+{
+    clear();
+    allocated_cown = other.allocated_cown;
+    if (allocated_cown != nullptr)
+        verona::rt::Cown::acquire(allocated_cown);
+    return *this;
+}
+```
+
+This means that the following code Just Works:
+
+```c++
+auto c1 = make_cown<int>(10);
+auto c2 = c1; // copy constuctor
+c2 = c1; // copy-assignment operator
+```
+
+And all the `=` magically update the reference count to be correct.
+
+Whereas in rust, because `=` moves (and there's no way to overload it), you need to instead write:
+
+```rust
+let c1 = Cown::new(10);
+let mut c2 = c1.clone()
+c2 = c1;
+```
+
+This adds visual clutter but also means that it's clearer when you're paying to
+cost to do reference counting.
 
 # Future Works
 

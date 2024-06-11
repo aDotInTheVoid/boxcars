@@ -241,16 +241,15 @@ namespace bench
       enter(const cown_ptr<Barber>&, cown_ptr<Customer>, cown_ptr<WaitingRoom>);
     };
 
-    __attribute__((noinline)) static uint32_t
-    cpp_barberwait(uint32_t wait, SimpleRand& random)
+    static uint32_t barberwait(uint32_t wait, SimpleRand& random)
     {
       uint32_t x = 0;
 
-      for (uint32_t i = 0; i < wait; ++i)
-      {
-        random.next();
-        x++;
-      }
+      // for (uint32_t i = 0; i < wait; ++i)
+      // {
+      //   random.next();
+      //   x++;
+      // }
 
       return x;
     }
@@ -284,7 +283,7 @@ namespace bench
               when(wr) << [](acquired_cown<WaitingRoom> wr) { wr->count--; };
 
               customer->sit_down();
-              cpp_barberwait(
+              barberwait(
                 barber->random.nextInt(barber->haircut_rate) + 10,
                 barber->random);
               CustomerFactory::left(customer->factory, customer.cown());
@@ -322,7 +321,7 @@ namespace bench
         {
           self->attempts++;
           WaitingRoom::enter(self->room, make_cown<Customer>(tag));
-          cpp_barberwait(self->random.nextInt(rate) + 10, self->random);
+          barberwait(self->random.nextInt(rate) + 10, self->random);
         }
       };
     }

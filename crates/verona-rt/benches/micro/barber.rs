@@ -45,15 +45,14 @@ impl Barber {
     }
 }
 
-#[no_mangle]
-#[inline(never)]
-fn rust_barberwait(wait: u32, random: &mut SimpleRand) -> u32 {
-    let mut x = 0;
-    for _ in 0..wait {
-        random.next();
-        x += 1;
-    }
-    x
+fn barberwait(_wait: u32, _random: &mut SimpleRand) -> u32 {
+    // let mut x = 0;
+    // for _ in 0..wait {
+    //     random.next();
+    //     x += 1;
+    // }
+    // x
+    0
 }
 
 struct WaitingRoom {
@@ -87,7 +86,7 @@ impl WaitingRoom {
 
                         let rate = barber.haircut_rate;
                         let wait_for = barber.random.next_int_with_max(rate) + 10;
-                        rust_barberwait(wait_for, &mut barber.random);
+                        barberwait(wait_for, &mut barber.random);
                         CustomerFactory::left(&customer.factory, customer.cown());
 
                         when((&barber.cown(), &wr), |(_barber, _wr)| {});
@@ -122,7 +121,7 @@ impl CustomerFactory {
                 for _ in 0..this.number_of_haircuts {
                     this.attempts += 1;
                     WaitingRoom::enter(&this.room, Cown::new(Customer::new(tag.clone())));
-                    rust_barberwait(this.random.next_int_with_max(rate) + 10, &mut this.random);
+                    barberwait(this.random.next_int_with_max(rate) + 10, &mut this.random);
                 }
             }
         })

@@ -97,15 +97,15 @@ fn time_philosophers(c: &mut Criterion) {
             });
         });
 
-        group.bench_with_input(
-            BenchmarkId::new("Rust Optimal", nthread),
-            &nthread,
-            |b, nthread| {
-                b.iter(|| {
-                    do_phil(20, 10000, false, *nthread);
-                });
-            },
-        );
+        // group.bench_with_input(
+        //     BenchmarkId::new("Rust Optimal", nthread),
+        //     &nthread,
+        //     |b, nthread| {
+        //         b.iter(|| {
+        //             do_phil(20, 10000, false, *nthread);
+        //         });
+        //     },
+        // );
 
         group.bench_with_input(BenchmarkId::new("C++", nthread), &nthread, |b, nthread| {
             b.iter(|| unsafe {

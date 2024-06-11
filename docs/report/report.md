@@ -333,25 +333,25 @@ auto c_foo = make_cown<Foo>("hello", 101);
 
 
 ```
-In file included from /home/alona/dev2/boxcars/crates/verona-rt-sys/verona-rt/src/rt/./cpp/when.h:6,
-                 from /home/alona/dev2/boxcars/crates/verona-rt-sys/cpp/playground.cc:1:
-/home/alona/dev2/boxcars/crates/verona-rt-sys/verona-rt/src/rt/./cpp/cown.h: In instantiation of ‘verona::cpp::ActualCown<T>::ActualCown(Args&& ...) [with Args = {const char (&)[6], int}; T = Foo]’:
-/home/alona/dev2/boxcars/crates/verona-rt-sys/verona-rt/src/rt/./cpp/cown.h:374:24:   required from ‘verona::cpp::cown_ptr<T> verona::cpp::make_cown(Args&& ...) [with T = Foo; Args = {const char (&)[6], int}]’
-/home/alona/dev2/boxcars/crates/verona-rt-sys/cpp/playground.cc:27:30:   required from here
-/home/alona/dev2/boxcars/crates/verona-rt-sys/verona-rt/src/rt/./cpp/cown.h:50:32: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+In file included from verona-rt/src/rt/./cpp/when.h:6,
+                 from cpp/playground.cc:1:
+verona-rt/src/rt/./cpp/cown.h: In instantiation of ‘verona::cpp::ActualCown<T>::ActualCown(Args&& ...) [with Args = {const char (&)[6], int}; T = Foo]’:
+verona-rt/src/rt/./cpp/cown.h:374:24:   required from ‘verona::cpp::cown_ptr<T> verona::cpp::make_cown(Args&& ...) [with T = Foo; Args = {const char (&)[6], int}]’
+cpp/playground.cc:27:30:   required from here
+verona-rt/src/rt/./cpp/cown.h:50:32: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
    50 |     ActualCown(Args&&... ts) : value(std::forward<Args>(ts)...)
       |                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       |                                |
       |                                const char*
-/home/alona/dev2/boxcars/crates/verona-rt-sys/cpp/playground.cc:21:11: note:   initializing argument 1 of ‘Foo::Foo(int, const char*)’
+cpp/playground.cc:21:11: note:   initializing argument 1 of ‘Foo::Foo(int, const char*)’
    21 |   Foo(int number, const char* str) : number_(number), str_(str) {}
       |       ~~~~^~~~~~
-/home/alona/dev2/boxcars/crates/verona-rt-sys/verona-rt/src/rt/./cpp/cown.h:50:32: error: invalid conversion from ‘int’ to ‘const char*’ [-fpermissive]
+verona-rt/src/rt/./cpp/cown.h:50:32: error: invalid conversion from ‘int’ to ‘const char*’ [-fpermissive]
    50 |     ActualCown(Args&&... ts) : value(std::forward<Args>(ts)...)
       |                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       |                                |
       |                                int
-/home/alona/dev2/boxcars/crates/verona-rt-sys/cpp/playground.cc:21:31: note:   initializing argument 2 of ‘Foo::Foo(int, const char*)’
+cpp/playground.cc:21:31: note:   initializing argument 2 of ‘Foo::Foo(int, const char*)’
    21 |   Foo(int number, const char* str) : number_(number), str_(str) {}
       | 
 ```
@@ -400,7 +400,169 @@ For more information about this error, try `rustc --explain E0308`.
 Which is much more understandable, as it doesn't need to take a detour through the templated libary code.
 <!-- TODO: More here about not needing std::forward -->
 
+#### Wrong Args
 
+Another case to consider is getting the arguments to the behaviour wrong.
 
+```c++
+auto a = make_cown<uint32_t>(101);
+when(a) << [](acquired_cown<bool> a) {};
+```
+
+This causes C++ compillers to spew out the internals of the `when` implementation, because the type signature isn't part of then `when` function:
+
+```
+In file included from cpp/playground.cc:1:
+verona-rt/src/rt/./cpp/when.h: In instantiation of ‘auto verona::cpp::When<F, Args>::to_tuple() [with F = real_main()::<lambda(verona::cpp::acquired_cown<bool>)>; Args = {verona::cpp::Access<unsigned int>}]’:
+verona-rt/src/rt/./cpp/when.h:181:28:   required from ‘void verona::cpp::Batch<Args>::create_behaviour(verona::rt::BehaviourCore**) [with long unsigned int index = 0; Args = {verona::cpp::When<real_main()::<lambda(verona::cpp::acquired_cown<bool>)>, verona::cpp::Access<unsigned int> >}]’
+verona-rt/src/rt/./cpp/when.h:204:25:   required from ‘verona::cpp::Batch<Args>::~Batch() [with Args = {verona::cpp::When<real_main()::<lambda(verona::cpp::acquired_cown<bool>)>, verona::cpp::Access<unsigned int> >}]’
+verona-rt/src/rt/./cpp/when.h:486:16:   required from ‘auto verona::cpp::PreWhen<Args>::operator<<(F&&) [with F = real_main()::<lambda(verona::cpp::acquired_cown<bool>)>; Args = {verona::cpp::Access<unsigned int>}]’
+cpp/playground.cc:19:41:   required from here
+verona-rt/src/rt/./cpp/when.h:398:27: error: no match for call to ‘(std::remove_reference<real_main()::<lambda(verona::cpp::acquired_cown<bool>)>&>::type {aka real_main()::<lambda(verona::cpp::acquired_cown<bool>)>}) (verona::cpp::acquired_cown<unsigned int>)’
+  398 |               std::move(f)(access_to_acquired<typename Args::Type>(args)...);
+      |               ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+verona-rt/src/rt/./cpp/when.h:398:27: note: candidate: ‘void (*)(verona::cpp::acquired_cown<bool>)’ (conversion)
+verona-rt/src/rt/./cpp/when.h:398:27: note:   candidate expects 2 arguments, 2 provided
+cpp/playground.cc:19:14: note: candidate: ‘real_main()::<lambda(verona::cpp::acquired_cown<bool>)>’
+   19 |   when(a) << [](acquired_cown<bool> a) {};
+      |              ^
+cpp/playground.cc:19:14: note:   no known conversion for argument 1 from ‘acquired_cown<unsigned int>’ to ‘acquired_cown<bool>’
+```
+
+Rust
+
+```rust
+let a = Cown::<u32>::new(101);
+when(&a, |a: AcquiredCown<bool>| {});
+```
+
+which gives:
+
+```
+error[E0631]: type mismatch in closure arguments
+  --> crates/verona-rt/examples/err.rs:20:5
+   |
+20 |     when(&a, |a: AcquiredCown<bool>| {});
+   |     ^^^^^^^^^-----------------------^^^^
+   |     |        |
+   |     |        found signature defined here
+   |     expected due to this
+   |
+   = note: expected closure signature `for<'a> fn(AcquiredCown<'a, u32>) -> _`
+              found closure signature `fn(AcquiredCown<'_, bool>) -> _`
+note: required by a bound in `when`
+  --> /home/alona/dev2/boxcars/crates/verona-rt/src/variadic_when.rs:14:8
+   |
+11 | pub fn when<C, F>(cowns: C, func: F)
+   |        ---- required by a bound in this function
+...
+14 |     F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `when`
+
+For more information about this error, try `rustc --explain E0631`.
+```
+
+#### Rustc being helpfull and unhelpfull
+
+```rust
+let foo = Cown::new(101);
+let bar = Cown::new(202);
+
+when((&foo, &bar), |foo, bar| {});
+```
+
+gives:
+
+```
+error[E0593]: closure is expected to take a single 2-tuple as argument, but it takes 2 distinct arguments
+  --> crates/verona-rt/examples/err.rs:22:5
+   |
+22 |     when((&foo, &bar), |foo, bar| {});
+   |     ^^^^^^^^^^^^^^^^^^^----------^^^^
+   |     |                  |
+   |     |                  takes 2 distinct arguments
+   |     expected closure that takes a single 2-tuple as argument
+   |
+help: change the closure to accept a tuple instead of individual arguments
+   |
+22 |     when((&foo, &bar), |(foo, bar)| {});
+   |  
+```
+
+However, not all cases can be caught, and you definatly can still get unhelpfull error messages:
+
+```rust
+let foo = Cown::new(101);
+let bar = Cown::new(202);
+
+when((foo, bar), |(foo, bar)| {});
+```
+
+Which produces:
+
+```
+error[E0277]: the trait bound `(Cown<{integer}>, Cown<{integer}>): CownCollection` is not satisfied
+  --> crates/verona-rt/examples/err.rs:22:10
+   |
+22 |     when((foo, bar), |(foo, bar)| {});
+   |     ---- ^^^^^^^^^^ the trait `CownCollection` is not implemented for `(Cown<{integer}>, Cown<{integer}>)`
+   |     |
+   |     required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `CownCollection`:
+             (&Cown<A>, &Cown<B>)
+             (&Cown<A>, &Cown<B>, &Cown<C>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>, &Cown<G>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>, &Cown<G>, &Cown<H>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>, &Cown<G>, &Cown<H>, &Cown<I>)
+note: required by a bound in `when`
+  --> /home/alona/dev2/boxcars/crates/verona-rt/src/variadic_when.rs:13:8
+   |
+11 | pub fn when<C, F>(cowns: C, func: F)
+   |        ---- required by a bound in this function
+12 | where
+13 |     C: CownCollection,
+   |        ^^^^^^^^^^^^^^ required by this bound in `when`
+
+error[E0277]: expected a `FnOnce(<(Cown<{integer}>, Cown<{integer}>) as CownCollection>::Acquired<'a>)` closure, found `_`
+  --> crates/verona-rt/examples/err.rs:22:22
+   |
+22 |     when((foo, bar), |(foo, bar)| {});
+   |     ----             ^^^^^^^^^^^^^^^ expected an `FnOnce(<(Cown<{integer}>, Cown<{integer}>) as CownCollection>::Acquired<'a>)` closure, found `_`
+   |     |
+   |     required by a bound introduced by this call
+   |
+   = help: the trait `CownCollection` is not implemented for `_`
+   = help: the following other types implement trait `CownCollection`:
+             (&Cown<A>, &Cown<B>)
+             (&Cown<A>, &Cown<B>, &Cown<C>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>, &Cown<G>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>, &Cown<G>, &Cown<H>)
+             (&Cown<A>, &Cown<B>, &Cown<C>, &Cown<D>, &Cown<E>, &Cown<F>, &Cown<G>, &Cown<H>, &Cown<I>)
+note: required by a bound in `when`
+  --> /home/alona/dev2/boxcars/crates/verona-rt/src/variadic_when.rs:14:8
+   |
+11 | pub fn when<C, F>(cowns: C, func: F)
+   |        ---- required by a bound in this function
+...
+14 |     F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `when`
+
+For more information about this error, try `rustc --explain E0277`.
+```
+
+The root of the problem is that you need to borrow these `Cown`s to form a
+`CownCollection`. However, becasue `when`s first argument is generic, `rustc`
+can't say what type it needs to be, only that it must implement a certain trait.
+This also causes a followup error, where it claims that the function has the
+wrong signature, because it can't find the correct one.
+
+# Future Works
 
 # References

@@ -3,7 +3,7 @@ use std::{hint::black_box, time::Instant};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use philosophers::do_phil;
-use verona_rt::{when, with_scheduler, Cown};
+use verona_rt::{when, with_n_threads, with_scheduler, Cown};
 
 #[path = "micro/banking.rs"]
 mod banking;
@@ -14,8 +14,8 @@ mod philosophers;
 
 fn create_n_cowns(n: usize) -> Vec<Cown<usize>> {
     let mut v = Vec::with_capacity(n);
-    for _ in 0..n {
-        v.push(Cown::new(n));
+    for i in 0..n {
+        v.push(Cown::<usize>::new(i));
     }
     v
 }
@@ -72,6 +72,7 @@ extern "C" {
     fn bbench_do_banking(accounts: u64, transactions: u64);
     fn bbench_do_barber(haircuts: u64, room: u64, production: u32, cut: u32);
     fn bbench_do_philosopher(philosophers: u64, rounds: u64, n_threads: usize);
+    fn bbench_create_scheduler();
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -116,7 +117,14 @@ fn time_philosophers(c: &mut Criterion) {
 }
 
 fn time_with_sched(c: &mut Criterion) {
-    c.bench_function("Scheduler", |b| b.iter(|| with_scheduler(|| {})));
+    let mut group = c.benchmark_group("Scheduler");
+
+    group.bench_function("Rust", |b| b.iter(|| with_n_threads(1, || { /* no-op */ })));
+    group.bench_function("C++", |b| {
+        b.iter(|| unsafe {
+            bbench_create_scheduler();
+        })
+    });
 }
 
 fn time_barber(c: &mut Criterion) {

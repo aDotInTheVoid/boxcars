@@ -38,7 +38,7 @@ pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
 }
 
 pub fn with_n_threads<T: Send>(n_threads: usize, f: impl FnOnce() -> T + Send) -> T {
-    with_inner(f, true, n_threads)
+    with_inner(f, false, n_threads)
 }
 
 fn with_inner<T, F: FnOnce() -> T>(f: F, detect_leaks: bool, n_threads: usize) -> T {

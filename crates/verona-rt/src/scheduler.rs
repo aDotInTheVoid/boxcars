@@ -29,15 +29,23 @@ impl Drop for DropGuard {
     }
 }
 
-pub fn with<T: Send>(f: impl FnOnce() -> T + Send) -> T {
-    with_inner(f, true)
+pub fn with_scheduler<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    // TODO: Correct default?
+    with_inner(f, true, 1)
+}
+pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
+    with_inner(f, true, 1)
 }
 
-pub fn with_inner<T, F: FnOnce() -> T>(f: F, detect_leaks: bool) -> T {
+pub fn with_n_threads<T: Send>(n_threads: usize, f: impl FnOnce() -> T + Send) -> T {
+    with_inner(f, true, n_threads)
+}
+
+fn with_inner<T, F: FnOnce() -> T>(f: F, detect_leaks: bool, n_threads: usize) -> T {
     let lock = SCHED_LOCK.lock();
 
     unsafe {
-        ffi::scheduler_init(scheduler_get(), 1);
+        ffi::scheduler_init(scheduler_get(), n_threads);
 
         if detect_leaks {
             ffi::schedular_set_detect_leaks(true);
@@ -65,17 +73,13 @@ pub fn with_inner<T, F: FnOnce() -> T>(f: F, detect_leaks: bool) -> T {
     result
 }
 
-pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
-    with_inner(f, true)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn basic_run() {
-        with(|| {});
+        with_scheduler(|| {});
     }
 
     #[test]
@@ -84,7 +88,7 @@ mod tests {
             for _ in 0..10 {
                 s.spawn(|| {
                     for _ in 0..100 {
-                        with(|| {});
+                        with_scheduler(|| {});
                     }
                 });
             }
@@ -98,7 +102,7 @@ mod tests {
             for _ in 0..10 {
                 s.spawn(|| {
                     for _ in 0..10 {
-                        let r = std::panic::catch_unwind(|| with(|| panic!("lol lmao")));
+                        let r = std::panic::catch_unwind(|| with_scheduler(|| panic!("lol lmao")));
                         let r_err = r.unwrap_err();
                         let s = r_err.downcast::<&str>().unwrap();
                         assert_eq!(&**s, "lol lmao");

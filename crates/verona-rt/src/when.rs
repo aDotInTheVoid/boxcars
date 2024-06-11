@@ -139,7 +139,7 @@ mod tests {
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let v = Cown::new(101);
             when1(&v, |mut v| {
                 assert_eq!(*v, 101);
@@ -161,7 +161,7 @@ mod tests {
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let v1 = Cown::new(1);
             let v2 = Cown::new(2);
             when2(&v1, &v2, |a1, a2| {
@@ -183,7 +183,7 @@ mod tests {
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let vec_cown = Cown::new(vec![1, 2, 3]);
 
             when1(&vec_cown, |mut v| {
@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn when_two() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let string = Cown::new(String::new());
             let vec = Cown::new(Vec::new());
 
@@ -238,7 +238,7 @@ mod tests {
     #[should_panic = ""]
     #[ignore = "Panics with schedular lock don't work, see #16"]
     fn double_acquire() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let c1 = Cown::new(10);
             let c2 = c1.clone();
             when2(&c1, &c2, |_, _| loop {});
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn fmt_acquired() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let x = Cown::new("101");
             when1(&x, |x| {
                 assert_eq!(*x, "101");

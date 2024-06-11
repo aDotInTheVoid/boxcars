@@ -356,13 +356,18 @@ namespace bench
 
     struct Table
     {
-      uint64_t done_eating;
+      size_t still_eating;
 
-      Table(uint64_t philosophers) : done_eating(philosophers) {}
+      Table(uint64_t philosophers) : still_eating(philosophers) {}
 
-      static void finished(cown_ptr<Table> self)
+      static void finished(const cown_ptr<Table>& self)
       {
-        when(self) << [](acquired_cown<Table> self) { --(self->done_eating); };
+        when(self) << [](acquired_cown<Table> self) { --(self->still_eating); };
+      }
+
+      ~Table()
+      {
+        assert(still_eating == 0);
       }
     };
 
@@ -373,29 +378,24 @@ namespace bench
 
     struct Philosopher
     {
-      size_t id;
       uint64_t rounds;
       cown_ptr<Fork> left;
       cown_ptr<Fork> right;
       cown_ptr<Table> table;
 
       Philosopher(
-        size_t id,
         uint64_t rounds,
         cown_ptr<Fork> left,
         cown_ptr<Fork> right,
         cown_ptr<Table> table)
-      : id(id),
-        rounds(rounds),
-        left(move(left)),
-        right(move(right)),
-        table(move(table))
+      : rounds(rounds), left(move(left)), right(move(right)), table(move(table))
       {}
 
       static void eat(cown_ptr<Philosopher> phil)
       {
         when(phil) << [](acquired_cown<Philosopher> phil) {
-          if (--phil->rounds >= 1)
+          phil->rounds--;
+          if (phil->rounds > 0)
           {
             when(phil->left, phil->right)
               << [](acquired_cown<Fork> left, acquired_cown<Fork> right) {};
@@ -742,25 +742,25 @@ extern "C"
     Scheduler::get().run();
   }
 
-  void bbench_do_philosopher(uint64_t philosophers, uint64_t rounds)
+  void
+  bbench_do_philosopher(size_t philosophers, uint64_t rounds, size_t n_threads)
   {
     using namespace bench::philosopher;
 
-    Scheduler::get().init(1);
+    Scheduler::get().init(n_threads);
 
     cown_ptr<Table> table = make_cown<Table>(philosophers);
 
     cown_ptr<Fork> first = make_cown<Fork>();
     cown_ptr<Fork> prev = first;
-    for (uint64_t i = 0; i < philosophers - 1; ++i)
+    for (size_t i = 0; i < philosophers - 1; ++i)
     {
       cown_ptr<Fork> next = make_cown<Fork>();
-      Philosopher::eat(
-        make_cown<Philosopher>(i, rounds, move(prev), next, table));
+      Philosopher::eat(make_cown<Philosopher>(rounds, move(prev), next, table));
       prev = move(next);
     }
-    Philosopher::eat(make_cown<Philosopher>(
-      philosophers - 1, rounds, move(prev), move(first), move(table)));
+    Philosopher::eat(
+      make_cown<Philosopher>(rounds, move(prev), move(first), move(table)));
 
     Scheduler::get().run();
   }

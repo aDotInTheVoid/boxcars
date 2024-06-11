@@ -69,7 +69,7 @@ mod tests;
 
 pub use cown::Cown;
 pub use log::{log, log_snmalloc};
-pub use scheduler::{with as with_scheduler, with_leak_detector};
+pub use scheduler::{with_leak_detector, with_n_threads, with_scheduler};
 pub use variadic_when::{when, CownCollection};
 pub use when::AcquiredCown;
 pub use when::{when1, when2, when3, when4, when5, when6, when7, when8, when9};

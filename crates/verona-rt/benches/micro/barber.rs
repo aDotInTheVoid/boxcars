@@ -3,7 +3,6 @@ use std::time::SystemTime;
 use verona_rt::{when, with_scheduler, Cown};
 
 use stdx::rand::SimpleRand;
-use verona_rt_sys::CownPtr;
 
 struct CustomerFactory {
     number_of_haircuts: u64,

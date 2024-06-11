@@ -1,0 +1,18 @@
+error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
+  --> tests/ui/partial-borrow.rs:19:44
+   |
+19 |             use_ints(&mut acq_cown.a, &mut acq_cown.b)
+   |             --------      --------         ^^^^^^^^ second mutable borrow occurs here
+   |             |             |
+   |             |             first mutable borrow occurs here
+   |             first borrow later used by call
+
+error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
+  --> tests/ui/partial-borrow.rs:30:65
+   |
+28 |             use_ints(
+   |             -------- first borrow later used by call
+29 |                 &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).a,
+   |                                                                 ------------- first mutable borrow occurs here
+30 |                 &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).b,
+   |                                                                 ^^^^^^^^^^^^^ second mutable borrow occurs here

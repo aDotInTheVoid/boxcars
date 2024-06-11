@@ -12,19 +12,19 @@ void do_log(const char* msg, const char* file, size_t line)
 using verona::cpp::make_cown;
 using verona::cpp::when;
 
+class Foo
+{
+  int number_;
+  const char* str_;
+
+public:
+  Foo(int number, const char* str) : number_(number), str_(str) {}
+};
+
 void real_main()
 {
-  auto a = make_cown<int>(101);
-
-  log("begin b0");
-
-  when(a) << [](auto a2) {
-    log("begin b1");
-    when(a2.cown()) << [](auto a3) { log("done b3"); };
-    log("end b1");
-  };
-
-  log("end b0");
+  // These are the wrong way round
+  auto c_foo = make_cown<Foo>("hello", 101);
 }
 
 int main(int argc, const char* const* argv)

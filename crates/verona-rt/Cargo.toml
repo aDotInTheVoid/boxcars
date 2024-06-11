@@ -25,6 +25,7 @@ __any_sanitizer = []
 clap = { version = "4.5.4", features = ["std", "help"] }
 criterion = "0.5.1"
 stdx = { path = "../stdx" }
+trybuild = "1.0.96"
 
 [[bench]]
 name = "micro"

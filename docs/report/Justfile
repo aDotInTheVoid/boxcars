@@ -3,8 +3,12 @@ gather:
 
 html: report_html
 report_html:
-    pandoc report.md -so report.html
+    pandoc report.md -so report.html --citeproc
 
 pdf: report_pdf
 report_pdf:
-    pandoc report.md -o report.pdf
+    pandoc report.md -o report.pdf --pdf-engine=xelatex --citeproc
+
+tex: report_tex
+report_tex:
+    pandoc report.md -so report.tex --pdf-engine=xelatex --citeproc

@@ -79,7 +79,8 @@
         "locale": "cpp",
         "random": "cpp",
         "print": "cpp",
-        "__bit_reference": "cpp"
+        "__bit_reference": "cpp",
+        "*.inc": "cpp"
     },
     "cmake.sourceDirectory": "/home/alona/icnotes/60010-final-year-project/crates/verona-rt-sys/cpp",
     "cSpell.words": [

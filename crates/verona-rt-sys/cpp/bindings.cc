@@ -1,6 +1,7 @@
 // TODO: Include what you use.
 // std
 #include <array>
+#include <float.h>
 #include <ostream>
 #include <stddef.h>
 #include <stdint.h>
@@ -19,6 +20,7 @@ using verona::rt::Scheduler;
 using verona::rt::Slot;
 using verona::rt::Work;
 
+using verona::cpp::acquired_cown;
 using verona::cpp::cown_ptr;
 using verona::cpp::make_cown;
 using verona::cpp::when;
@@ -65,6 +67,333 @@ namespace bench
       parallel_fib_into_carefull(n - 2, result);
       when(result, f1) << [](auto r, auto f) { *r += f; };
     }
+  }
+
+  // https://github.com/ic-slurp/verona-benchmarks/blob/4238a9e0217495af95caf361fe9829bb82cca581/util/random.h#L20C1-L34C3
+  struct SimpleRand /*: public Random */
+  {
+    uint64_t value;
+
+    SimpleRand(uint64_t x) : value(x) {}
+
+    SimpleRand() : SimpleRand(0xDEADBEAF) {}
+
+    uint64_t next()
+    {
+      return nextLong();
+    }
+
+    uint64_t nextLong()
+    {
+      return std::exchange(value, ((value * 1309) + 13849) & 65535);
+    }
+
+    uint32_t nextInt()
+    {
+      return nextInt(0);
+    }
+
+    uint32_t nextInt(uint32_t max)
+    {
+      return max == 0 ? uint32_t(nextLong()) : (uint32_t(nextLong()) % max);
+    }
+
+    double nextDouble()
+    {
+      return double(1.0 / (nextLong() + 1));
+    }
+  };
+
+  // https://github.com/ic-slurp/verona-benchmarks/blob/4238a9e0217495af95caf361fe9829bb82cca581/savina/boc/concurrency/banking.h#L18
+  namespace banking
+  {
+
+    using verona::cpp::acquired_cown;
+
+    struct Account
+    {
+      double balance;
+
+      Account(double balance) : balance(balance) {}
+
+      void debit(double amount)
+      {
+        balance -= amount;
+      }
+
+      void credit(double amount)
+      {
+        balance += amount;
+      }
+    };
+
+    struct Teller
+    {
+      uint64_t transactions;
+      SimpleRand random;
+      uint64_t completed;
+      std::vector<cown_ptr<Account>> accounts;
+
+      Teller(
+        double initial_balance, uint64_t num_accounts, uint64_t transactions)
+      : transactions(transactions), random(SimpleRand(123456)), completed(0)
+
+      {
+        for (uint64_t i = 0; i < num_accounts; i++)
+        {
+          accounts.emplace_back(make_cown<Account>(initial_balance));
+        }
+      }
+
+      static void spawn_transactions(const cown_ptr<Teller>& self)
+      {
+        when(self) << [tag = self](acquired_cown<Teller> self) mutable {
+          for (uint64_t i = 0; i < self->transactions; i++)
+          {
+            // Randomly pick source and destination account
+            uint64_t source;
+            uint64_t dest;
+
+            do
+            { // changed from actors to avoid deadlock from aliasing
+              source = self->random.nextInt((self->accounts.size() / 10) * 8);
+              dest = self->random.nextInt(self->accounts.size() - source);
+            } while (source == dest);
+
+            if (dest == 0)
+              dest++;
+
+            const cown_ptr<Account>& src = self->accounts[source];
+            const cown_ptr<Account>& dst = self->accounts[dest];
+            double amount = self->random.nextDouble() * 1000;
+
+            when(src, dst) << [amount, tag](
+                                acquired_cown<Account> src,
+                                acquired_cown<Account> dst) mutable {
+              src->debit(amount);
+              dst->credit(amount);
+
+              Teller::reply(tag);
+            };
+          }
+        };
+      }
+
+      static void reply(const cown_ptr<Teller>& self)
+      {
+        when(self) << [](acquired_cown<Teller> self) mutable {
+          self->completed++;
+          if (self->completed == self->transactions)
+          {
+            return;
+          }
+        };
+      }
+    };
+
+  }
+
+  namespace barber
+  {
+
+    struct Customer;
+    struct WaitingRoom;
+
+    struct CustomerFactory
+    {
+      uint64_t number_of_haircuts;
+      uint64_t attempts;
+      cown_ptr<WaitingRoom> room;
+      SimpleRand random;
+
+      CustomerFactory(uint64_t number_of_haircuts, cown_ptr<WaitingRoom>&& room)
+      : number_of_haircuts(number_of_haircuts),
+        attempts(0),
+        room(std::move(room))
+      {}
+
+      static void run(cown_ptr<CustomerFactory>&, uint32_t);
+      static void
+      returned(const cown_ptr<CustomerFactory>&, cown_ptr<Customer>);
+      static void left(const cown_ptr<CustomerFactory>&, cown_ptr<Customer>);
+    };
+
+    struct Customer
+    {
+      cown_ptr<CustomerFactory> factory;
+
+      Customer(cown_ptr<CustomerFactory> factory) : factory(std::move(factory))
+      {}
+
+      static void full(const cown_ptr<Customer>&);
+      void wait();
+      void sit_down() {};
+    };
+
+    struct Barber
+    {
+      uint32_t haircut_rate;
+      SimpleRand random;
+
+      Barber(uint32_t haircut_rate) : haircut_rate(haircut_rate) {}
+
+      static void
+      enter(const cown_ptr<Barber>&, cown_ptr<Customer>, cown_ptr<WaitingRoom>);
+    };
+
+    static uint32_t barberwait(uint32_t wait, SimpleRand& random)
+    {
+      uint32_t x = 0;
+
+      // for (uint32_t i = 0; i < wait; ++i)
+      // {
+      //   random.next();
+      //   x++;
+      // }
+
+      return x;
+    }
+
+    struct WaitingRoom
+    {
+      const uint64_t size;
+      uint64_t count = 0;
+      cown_ptr<Barber> barber;
+
+      WaitingRoom(uint64_t size, const cown_ptr<Barber>& barber)
+      : size(size), barber(barber)
+      {}
+
+      static void
+      enter(const cown_ptr<WaitingRoom>& wr, cown_ptr<Customer> customer)
+      {
+        when(wr) << [customer =
+                       std::move(customer)](acquired_cown<WaitingRoom> wr) {
+          if (wr->count == wr->size)
+          {
+            Customer::full(std::move(customer));
+          }
+          else
+          {
+            wr->count++;
+
+            when(wr->barber, customer) << [wr = wr.cown()](
+                                            acquired_cown<Barber> barber,
+                                            acquired_cown<Customer> customer) {
+              when(wr) << [](acquired_cown<WaitingRoom> wr) { wr->count--; };
+
+              customer->sit_down();
+              barberwait(
+                barber->random.nextInt(barber->haircut_rate) + 10,
+                barber->random);
+              CustomerFactory::left(customer->factory, customer.cown());
+
+              when(barber.cown(), wr) << [](
+                                           acquired_cown<Barber> barber,
+                                           acquired_cown<WaitingRoom> wr) {};
+            };
+          }
+        };
+      }
+    };
+
+    void CustomerFactory::returned(
+      const cown_ptr<CustomerFactory>& self, cown_ptr<Customer> customer)
+    {
+      when(self) <<
+        [customer = std::move(customer)](acquired_cown<CustomerFactory> self) {
+          self->attempts++;
+          WaitingRoom::enter(self->room, std::move(customer));
+        };
+    }
+
+    void CustomerFactory::left(
+      const cown_ptr<CustomerFactory>& self, cown_ptr<Customer> customer)
+    {
+      when(self) <<
+        [](acquired_cown<CustomerFactory> self) { self->number_of_haircuts--; };
+    }
+
+    void CustomerFactory::run(cown_ptr<CustomerFactory>& self, uint32_t rate)
+    {
+      when(self) << [tag = self, rate](acquired_cown<CustomerFactory> self) {
+        for (uint64_t i = 0; i < self->number_of_haircuts; ++i)
+        {
+          self->attempts++;
+          WaitingRoom::enter(self->room, make_cown<Customer>(tag));
+          barberwait(self->random.nextInt(rate) + 10, self->random);
+        }
+      };
+    }
+
+    void Customer::full(const cown_ptr<Customer>& self)
+    {
+      when(self) << [](acquired_cown<Customer> self) {
+        CustomerFactory::returned(self->factory, self.cown());
+      };
+    }
+
+    void Customer::wait() {}
+  }
+
+  namespace philosopher
+  {
+    using std::move;
+
+    struct Table
+    {
+      size_t still_eating;
+
+      Table(uint64_t philosophers) : still_eating(philosophers) {}
+
+      static void finished(const cown_ptr<Table>& self)
+      {
+        when(self) << [](acquired_cown<Table> self) { --(self->still_eating); };
+      }
+
+      ~Table()
+      {
+        assert(still_eating == 0);
+      }
+    };
+
+    struct Fork
+    {
+      Fork() {}
+    };
+
+    struct Philosopher
+    {
+      uint64_t rounds;
+      cown_ptr<Fork> left;
+      cown_ptr<Fork> right;
+      cown_ptr<Table> table;
+
+      Philosopher(
+        uint64_t rounds,
+        cown_ptr<Fork> left,
+        cown_ptr<Fork> right,
+        cown_ptr<Table> table)
+      : rounds(rounds), left(move(left)), right(move(right)), table(move(table))
+      {}
+
+      static void eat(cown_ptr<Philosopher> phil)
+      {
+        when(phil) << [](acquired_cown<Philosopher> phil) {
+          phil->rounds--;
+          if (phil->rounds > 0)
+          {
+            when(phil->left, phil->right)
+              << [](acquired_cown<Fork> left, acquired_cown<Fork> right) {};
+            eat(phil.cown());
+          }
+          else
+          {
+            Table::finished(phil->table);
+          }
+        };
+      }
+    };
   }
 }
 
@@ -295,7 +624,7 @@ extern "C"
     std::vector<cown_ptr<size_t>> v;
     v.reserve(n);
 
-    for (int i = 0; i < n; i++)
+    for (size_t i = 0; i < n; i++)
     {
       v.push_back(make_cown<size_t>(i));
     }
@@ -368,6 +697,64 @@ extern "C"
       };
     }
 
+    Scheduler::get().run();
+  }
+
+  void bbench_do_banking(uint64_t acccounts, uint64_t transactions)
+  {
+    Scheduler::get().init(1);
+    double initial = DBL_MAX / float(acccounts * transactions);
+
+    auto teller =
+      make_cown<bench::banking::Teller>(initial, acccounts, transactions);
+
+    bench::banking::Teller::spawn_transactions(teller);
+
+    Scheduler::get().run();
+  }
+
+  void bbench_do_barber(
+    uint64_t haircuts, uint64_t room, uint32_t production, uint32_t cut)
+  {
+    Scheduler::get().init(1);
+
+    using namespace bench::barber;
+
+    auto barber = make_cown<Barber>(cut);
+    auto wr = make_cown<WaitingRoom>(room, std::move(barber));
+    auto cf = make_cown<CustomerFactory>(haircuts, std::move(wr));
+
+    CustomerFactory::run(cf, production);
+
+    Scheduler::get().run();
+  }
+
+  void
+  bbench_do_philosopher(size_t philosophers, uint64_t rounds, size_t n_threads)
+  {
+    using namespace bench::philosopher;
+
+    Scheduler::get().init(n_threads);
+
+    cown_ptr<Table> table = make_cown<Table>(philosophers);
+
+    cown_ptr<Fork> first = make_cown<Fork>();
+    cown_ptr<Fork> prev = first;
+    for (size_t i = 0; i < philosophers - 1; ++i)
+    {
+      cown_ptr<Fork> next = make_cown<Fork>();
+      Philosopher::eat(make_cown<Philosopher>(rounds, move(prev), next, table));
+      prev = move(next);
+    }
+    Philosopher::eat(
+      make_cown<Philosopher>(rounds, move(prev), move(first), move(table)));
+
+    Scheduler::get().run();
+  }
+
+  void bbench_create_scheduler(void)
+  {
+    Scheduler::get().init(1);
     Scheduler::get().run();
   }
 }

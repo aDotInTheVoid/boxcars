@@ -7,7 +7,7 @@ use crate::descriptor::get_desc;
 pub struct Cown<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
     // TODO: Is this right wrt send/sync.
-    _marker: PhantomData<T>,
+    pub(crate) _marker: PhantomData<T>,
 }
 
 // https://doc.rust-lang.org/1.78.0/src/std/sync/mutex.rs.html#187
@@ -90,7 +90,7 @@ mod tests {
 
     use super::*;
 
-    use crate::scheduler::{self, with, with_leak_detector};
+    use crate::scheduler::{self, with_leak_detector, with_scheduler};
 
     #[test]
     fn new() {
@@ -106,14 +106,14 @@ mod tests {
 
     #[test]
     fn new_minimal() {
-        with(|| {
+        with_scheduler(|| {
             Cown::new(10);
         })
     }
 
     #[test]
     fn clone_minimal() {
-        with(|| {
+        with_scheduler(|| {
             let v1 = Cown::new(42);
             _ = v1.clone();
         })
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn clone_notnull() {
-        with(|| {
+        with_scheduler(|| {
             let v1 = Cown::new(10);
             let v2 = v1.clone();
             assert_ne!(v2.cown_ptr.addr(), ptr::null_mut());
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn dtor() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let flag = Cell::new(false);
             let cown = Cown::new(WriteOnDrop(&flag));
 
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn dtor_clone() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let flag = Cell::new(false);
             let cown = Cown::new(WriteOnDrop(&flag));
 

@@ -1,9 +1,14 @@
 gather:
     ./gather_imgs.sh
 
-report_html: gather
-    pandoc report.md -so report.html
+html: report_html
+report_html:
+    pandoc report.md -so report.html --citeproc
 
 pdf: report_pdf
-report_pdf: gather
-    pandoc report.md -o report.pdf
+report_pdf:
+    pandoc report.md -o report.pdf --pdf-engine=xelatex --citeproc
+
+tex: report_tex
+report_tex:
+    pandoc report.md -so report.tex --pdf-engine=xelatex --citeproc

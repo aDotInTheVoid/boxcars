@@ -12,6 +12,11 @@ pub struct AcquiredCown<'a, T> {
     marker: PhantomData<&'a mut T>,
 }
 
+// Same as for &mut T
+unsafe impl<T: Send> Send for AcquiredCown<'_, T> {}
+unsafe impl<T: Sync> Sync for AcquiredCown<'_, T> {}
+// TODO: Do we need these??
+
 impl<'a, T> AcquiredCown<'a, T> {
     fn data_ptr(&self) -> *mut T {
         super::cown::cown_to_data(self.ptr.addr())
@@ -96,6 +101,20 @@ fn is_unique<const N: usize>(cown: &[ffi::CownPtr; N]) -> bool {
     !addrs.windows(2).any(|w| w[0] == w[1])
 }
 
+impl<T> AcquiredCown<'_, T> {
+    // TODO: This shouldn't be needed.
+    // TODO: impl CownCollection for AcquiredCown.
+    pub fn cown(&self) -> Cown<T> {
+        unsafe {
+            ffi::boxcars_acquire_object(self.ptr);
+            Cown {
+                cown_ptr: self.ptr,
+                _marker: PhantomData,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -107,7 +126,7 @@ mod tests {
     };
     use stdx::SetOnDrop;
 
-    use crate::{scheduler, with_leak_detector};
+    use crate::{scheduler, when, with_leak_detector};
 
     use super::*;
 
@@ -120,7 +139,7 @@ mod tests {
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let v = Cown::new(101);
             when1(&v, |mut v| {
                 assert_eq!(*v, 101);
@@ -142,7 +161,7 @@ mod tests {
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let v1 = Cown::new(1);
             let v2 = Cown::new(2);
             when2(&v1, &v2, |a1, a2| {
@@ -164,7 +183,7 @@ mod tests {
 
         assert_eq!(RUN_COUNTER.load(Ordering::SeqCst), 0);
 
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let vec_cown = Cown::new(vec![1, 2, 3]);
 
             when1(&vec_cown, |mut v| {
@@ -192,7 +211,7 @@ mod tests {
 
     #[test]
     fn when_two() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let string = Cown::new(String::new());
             let vec = Cown::new(Vec::new());
 
@@ -219,7 +238,7 @@ mod tests {
     #[should_panic = ""]
     #[ignore = "Panics with schedular lock don't work, see #16"]
     fn double_acquire() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let c1 = Cown::new(10);
             let c2 = c1.clone();
             when2(&c1, &c2, |_, _| loop {});
@@ -228,7 +247,7 @@ mod tests {
 
     #[test]
     fn fmt_acquired() {
-        scheduler::with(|| {
+        scheduler::with_scheduler(|| {
             let x = Cown::new("101");
             when1(&x, |x| {
                 assert_eq!(*x, "101");
@@ -461,6 +480,47 @@ mod tests {
                 let shared = shared2.lock().unwrap();
                 assert_eq!(*shared, 20);
             });
+        })
+    }
+
+    #[test]
+    fn acq_cown_to_cown() {
+        with_leak_detector(|| {
+            let c = Cown::new(1010);
+
+            when1(&c, |c2| {
+                when1(&c2.cown(), |c3| {
+                    assert_eq!(*c3, 1010);
+                })
+            });
+        })
+    }
+
+    #[test]
+    fn acq_cown_sync() {
+        with_leak_detector(|| {
+            struct WaitRoom {
+                barber: Cown<i32>,
+                value: i32,
+            }
+
+            let wr = Cown::new(WaitRoom {
+                barber: Cown::new(83),
+                value: 566,
+            });
+            let wr = &wr;
+            let customer = Cown::new(345);
+
+            when(wr, move |wr| {
+                when((&wr.barber, &customer), {
+                    let wr = wr.cown();
+                    move |(_, _)| {
+                        when(&wr, |wr| {
+                            assert_eq!(wr.value, 566);
+                        });
+                    }
+                });
+            })
         })
     }
 }

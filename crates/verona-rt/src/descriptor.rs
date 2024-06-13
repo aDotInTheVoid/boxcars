@@ -26,17 +26,22 @@ extern "C" fn drop_glue_for<T>(obj: *mut Object) {
 
 extern "C" fn noop_trace(_o: *const ffi::Object, _os: *mut ffi::ObjectStack) {}
 
-// Incredible workaround for static promotion.
-trait Hack {
-    const DESC: &'static Descriptor;
-}
-impl<T> Hack for T {
-    const DESC: &'static Descriptor = &make_desciptor::<T>();
-}
 pub(crate) const fn get_desc<T>() -> &'static Descriptor {
-    // TODO: Use this when inline const gets stabilized.
-    // &const { make_desciptor::<T>() }
-    <T as Hack>::DESC
+    //                 ______
+    //           _____/      \\_____
+    //          |  _     ___   _   ||
+    //          | | \     |   | \  ||
+    //          | |  |    |   |  | ||
+    //          | |_/     |   |_/  ||
+    //          | | \     |   |    ||
+    //          | |  \    |   |    ||
+    //          | |   \. _|_. | .  ||
+    //          |                  ||
+    //          |    hack trait    ||
+    //          |                  ||
+    //  *       | *   **    * **   |**      **
+    //   \))ejm97/.,(//,,..,,\||(,,.,\\,.((//
+    const { &make_desciptor::<T>() }
 }
 
 #[test]

@@ -1,29 +1,15 @@
 use core::ptr;
 
 use verona_rt_sys::descriptor as ffi;
-use verona_rt_sys::descriptor::{Descriptor, Object};
 use verona_rt_sys::vsizeof;
 
-/// `static Descriptor* desc()` in `vobject.h`
-const fn make_desciptor<T>() -> Descriptor {
-    let size = vsizeof::<T>();
-
-    ffi::Descriptor {
-        size,
-        trace: noop_trace,
-        finaliser: None,
-        notified: None,
-        destructor: Some(drop_glue_for::<T>),
-    }
-}
-
-extern "C" fn drop_glue_for<T>(obj: *mut Object) {
+extern "C" fn drop_glue_for<T>(obj: *mut ffi::Object) {
     unsafe { ptr::drop_in_place::<T>(obj.cast()) }
 }
 
 extern "C" fn noop_trace(_o: *const ffi::Object, _os: *mut ffi::ObjectStack) {}
 
-pub(crate) const fn get_desc<T>() -> &'static Descriptor {
+pub(crate) const fn get_desc<T>() -> &'static ffi::Descriptor {
     //                 ______
     //           _____/      \\_____
     //          |  _     ___   _   ||
@@ -38,7 +24,16 @@ pub(crate) const fn get_desc<T>() -> &'static Descriptor {
     //          |                  ||
     //  *       | *   **    * **   |**      **
     //   \))ejm97/.,(//,,..,,\||(,,.,\\,.((//
-    const { &make_desciptor::<T>() }
+    const {
+        // `static Descriptor* desc()` in `vobject.h`
+        &ffi::Descriptor {
+            size: vsizeof::<T>(),
+            trace: noop_trace,
+            finaliser: None,
+            notified: None,
+            destructor: Some(drop_glue_for::<T>),
+        }
+    }
 }
 
 #[test]

@@ -12,14 +12,9 @@ pub struct AcquiredCown<'a, T> {
     marker: PhantomData<&'a mut T>,
 }
 
-// Same as for &mut T
-unsafe impl<T: Send> Send for AcquiredCown<'_, T> {}
-unsafe impl<T: Sync> Sync for AcquiredCown<'_, T> {}
-// TODO: Do we need these??
-
 impl<'a, T> AcquiredCown<'a, T> {
     fn data_ptr(&self) -> *mut T {
-        super::cown::cown_to_data(self.ptr.addr())
+        super::cown::cown_to_data(self.ptr)
     }
 }
 

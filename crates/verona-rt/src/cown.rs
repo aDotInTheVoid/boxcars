@@ -7,12 +7,8 @@ use crate::descriptor::get_desc;
 pub struct Cown<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
     // TODO: Is this right wrt send/sync.
-    pub(crate) _marker: PhantomData<T>,
+    pub(crate) _marker: PhantomData<std::sync::Mutex<T>>,
 }
-
-// https://doc.rust-lang.org/1.78.0/src/std/sync/mutex.rs.html#187
-unsafe impl<T: Send> Send for Cown<T> {}
-unsafe impl<T: Send> Sync for Cown<T> {}
 
 #[repr(C)]
 pub(crate) struct CownData<T> {
@@ -21,7 +17,9 @@ pub(crate) struct CownData<T> {
     data: T,
 }
 
-pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
+pub(crate) fn cown_to_data<T>(ptr: ffi::CownPtr) -> *mut T {
+    let ptr = ptr.addr();
+
     debug_assert!(!ptr.is_null());
     debug_assert!((ptr as usize) & 15 == 0, "{ptr:p} not 16 bit aligned");
 
@@ -32,7 +30,7 @@ pub(crate) fn cown_to_data<T>(ptr: *mut ()) -> *mut T {
 
 impl<T> Cown<T> {
     fn data_ptr(&self) -> *mut T {
-        cown_to_data(self.cown_ptr.addr())
+        cown_to_data(self.cown_ptr)
     }
 
     #[cfg(test)]
@@ -70,7 +68,7 @@ impl<T> Cown<T> {
     // TODO: Enforce that.
     pub fn new(value: T) -> Self {
         unsafe {
-            let desc = get_desc::<T>();
+            let desc = get_desc::<CownData<T>>();
             let cown_ptr = ffi::boxcars_allocate_cown(desc);
 
             let this = Self {

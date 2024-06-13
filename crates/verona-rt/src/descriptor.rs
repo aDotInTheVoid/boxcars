@@ -4,11 +4,9 @@ use verona_rt_sys::descriptor as ffi;
 use verona_rt_sys::descriptor::{Descriptor, Object};
 use verona_rt_sys::vsizeof;
 
-use crate::cown::{cown_to_data, CownData};
-
 /// `static Descriptor* desc()` in `vobject.h`
 const fn make_desciptor<T>() -> Descriptor {
-    let size = vsizeof::<CownData<T>>();
+    let size = vsizeof::<T>();
 
     ffi::Descriptor {
         size,
@@ -20,8 +18,7 @@ const fn make_desciptor<T>() -> Descriptor {
 }
 
 extern "C" fn drop_glue_for<T>(obj: *mut Object) {
-    let t_ptr: *mut T = cown_to_data::<T>(obj as _);
-    unsafe { ptr::drop_in_place(t_ptr) }
+    unsafe { ptr::drop_in_place::<T>(obj.cast()) }
 }
 
 extern "C" fn noop_trace(_o: *const ffi::Object, _os: *mut ffi::ObjectStack) {}

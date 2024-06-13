@@ -30,8 +30,11 @@ pub struct Scheduler(*mut ());
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct CownPtr {
+    // TODO: Can we use not-null here?
     addr: *mut (),
 }
+unsafe impl Send for CownPtr {}
+unsafe impl Sync for CownPtr {}
 
 impl fmt::Pointer for CownPtr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

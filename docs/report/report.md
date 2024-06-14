@@ -15,11 +15,8 @@ colorlinks: true
 numbersections: true
 ---
 
-# Abstract
 
-Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm [@when_concurrency_matters]. I introduce Rust bindings to the verona-runtime.
-
-# Acknowledgements
+#### Acknowledgements
 
 Marios Kogias, Mathiew Parkinson, David Chisnall, Sylvan Clebsch, Mara Bos, Nora
 
@@ -34,32 +31,367 @@ Marios Kogias, Mathiew Parkinson, David Chisnall, Sylvan Clebsch, Mara Bos, Nora
 
 # Introduction
 
+
 # Background
 
-# Design
+## Rust
+
+Rust [@rust_book] is a programming languages originally developed by Mozilla Research,
+and currently maintained by a large cross-org team.
+
+Rust's most important feature (for our purposes) is its system of **Ownership & Borrowing**.
+
+### Ownership & Borrowing: A very fast introduction.
+
+(A full tutorial on ownership and borrowing is beyond the scope of this report. See [@rust_book] for details.)
+The core idea of **ownership** is that each value has a unique owner, and that value is dropped when the
+owner goes out of scope. To quote The Book [@rust_book]:
+
+> - Each value in Rust has an owner.
+> - There can only be one owner at a time.
+> - When the owner goes out of scope, the value will be dropped.
+
+However with only these rules, programming in Rust would be extremely
+uneconomic. If a function took a string as a parameter, it would have "take
+ownership" of that value, so the calling function could no longer use it.
+[^return_values]
+
+[^return_values]: This could be circumvented by having a function return back it's args to the caller, but this would
+be extremely cumbersome.
+
+Therefore, Rust introduces the additional notion of **borrowing**. A value can be borrowed in
+one of two ways: by a shared reference (spelt `&T`), or an exclusive reference (`&mut T`). These are
+also sometimes referred to as a immutable or mutable reference respectively [@dtolnay_ref].
+
+A value may have many shared references to it at a given time, but if it has any
+exclusive reference to it that reference must be the only one. With a shared
+reference, you can only read from the value. An exclusive reference is required
+to mutate it. More succinctly, Rust references are "Aliasable XOR mutable" [@boats_smaller].
+
+Borrowed values have a **lifetime** for which they are borrowed. This is needed to ensure
+that all exclusive references don't overlap with shared ones.
 
 ```rust
-pub struct Cown<T> { ... }
+let x: i32 = 0;
 
-impl<T> Cown<T> {
-   pub fn new(value: T) -> Self { ... }
+let shared_1: &i32 = &x; // Lifetime 1 starts
+dbg!(shared_1);
+// Lifetime 1 stops.
+
+let exclusive_2: &mut i32 = &mut x; // Lifetime 2 starts
+// Would be compiler error to borrow x here.
+*exclusive_2 += 10;
+// Lifetime 2 ends
+
+// But now that lifetime 2 is over, we can borrow again
+
+let shared_3: &i32 = &x; // Lifetime 3 starts
+let shared_4: &i32 = &x; // Lifetime 4 starts
+
+dbg!(shared_4);
+// Lifetime 4 ends
+dbg!(shared_3);
+// Lifetime 3 ends
+```
+
+This is also used to ensure that references don't outlive the objects they borrow.
+
+```rust
+let mut x: &i32 = 0;
+{
+    let short_lived: i32 = 0;
+    x = &short_lived;
+} // short_lived goes out of scope here.
+dbg!(x);
+```
+
+will error with
+
+```
+error[E0597]: `short_lived` does not live long enough
+ --> src/main.rs:5:13
+  |
+4 |         let short_lived: i32 = 0;
+  |             ----------- binding `short_lived` declared here
+5 |         x = &short_lived;
+  |             ^^^^^^^^^^^^ borrowed value does not live long enough
+6 |     }
+  |     - `short_lived` dropped here while still borrowed
+7 |     dbg!(x);
+  |          - borrow later used here
+```
+
+instead of doing UB like it would in C++.
+
+### Consequence of this: No iterator invalidation
+
+(Note, these examples adapted from "Two Beautiful Rust Programs" [@matklad_beautiful], because otherwise
+I'd be recreating them from memory)
+
+https://matklad.github.io/2020/07/15/two-beautiful-programs.html
+
+```Rust
+fn main() {
+  let mut xs = vec![1, 2, 3];
+  let x: &i32 = &xs[0];
+  xs.push(92);
+  println!("{}", *x);
 }
 ```
 
-```rust
-pub fn when1<Func, T: 'static>(cown: &Cown<T>, func: Func)
-where
-    Func: for<'a> FnOnce(AcquiredCown<'a, T>) + Send + 'static { ... }
+```
+error[E0502]: cannot borrow `xs` as mutable because it is also borrowed as immutable
+ --> <source>:4:3
+  |
+3 |   let x: &i32 = &xs[0];
+  |                  -- immutable borrow occurs here
+4 |   xs.push(92);
+  |   ^^^^^^^^^^^ mutable borrow occurs here
+5 |   println!("{}", *x);
+  |                  -- immutable borrow later used here
+
+error: aborting due to previous error
 ```
 
-```rust
-pub fn when<C, F>(cowns: C, func: F)
-where
-    C: CownCollection,
-    F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
+whereas in C++
+
+```cpp
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> xs {1, 2, 3};
+    int* x = &xs[0];
+    xs.push_back(4);
+    std::cout << *x << '\n'; 
+}
 ```
+
+does undefined behavior.
+
+This is because when we call `.push_back()`, the vector needs to reallocate, as it initially
+only had enough capacity for 3 elements. After moving the values to the new allocation, it frees
+the old one. This means `x` is a dangling pointer, and dereferencing it is a heap use-after-free.
+
+Indeeed, we can see this by using Asan, which can show up a stack trace of when this happend.
+
+```
+=================================================================
+==26780==ERROR: AddressSanitizer: heap-use-after-free on address 0x602000000010 at pc 0x55dc3792032f bp 0x7ffcdf94ec50 sp 0x7ffcdf94ec48
+READ of size 4 at 0x602000000010 thread T0
+    #0 0x55dc3792032e in main /home/alona/tmp/./bad.cpp:8:18
+   
+0x602000000010 is located 0 bytes inside of 12-byte region [0x602000000010,0x60200000001c)
+freed by thread T0 here:
+    #0 0x55dc3791e131 in operator delete(void*) (/home/alona/tmp/a.out+0xf6131) (BuildId: ba94dc30bfb525b0467634abdb5f45d077025f55)
+    #6 0x55dc379207fc in std::vector<int, std::allocator<int>>::push_back(int&&) /usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/stl_vector.h:1296:9
+    #7 0x55dc379202de in main /home/alona/tmp/./bad.cpp:7:8
+  
+previously allocated by thread T0 here:
+    #0 0x55dc3791d8b1 in operator new(unsigned long) (/home/alona/tmp/a.out+0xf58b1) (BuildId: ba94dc30bfb525b0467634abdb5f45d077025f55)
+    #5 0x55dc379206bd in std::vector<int, std::allocator<int>>::vector(std::initializer_list<int>, std::allocator<int> const&) /usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/stl_vector.h:679:2
+    #6 0x55dc37920234 in main /home/alona/tmp/./bad.cpp:5:22
+```
+
+We allocated some memory to create the vector, took a reference to it,
+ but then freed it when we did the `push_back()`, and
+then used the it afterwards.
+
+
+
+Currently on my machine it prints a seemingly random value.
+However modifying to so that the vector is larger (`std::vector<int> xs (1000000, -1);`),
+makes the program segfault instead. The exact details of what happens here are at the whims
+of the compiler and the standard library
+
+### Consequence of this: Fearless concurrency
+
+```Rust
+use std::thread::scope;
+use std::sync::{Mutex, MutexGuard};
+
+fn main() {
+  let mut counter = Mutex::new(0);
+
+  scope(|s| {
+    for _ in 0..10 {
+      s.spawn(|| {
+        let mut guard: MutexGuard<i32> = counter.lock().unwrap();
+        *guard += 1;
+      });
+    }
+  });
+
+  let total: &mut i32 = counter.get_mut().unwrap();
+  *total += 1;
+  println!("total = {total}");
+}
+```
+
+1. Each thread only accesses the counter through the mutex.
+2. Each thread can read from `main`'s stack.
+3. Final increment doesn't need to lock mutex, no other threads could have it.
+
+If any of these properties had changed, we'd get a compiler error.
+
+### Ownership & Borrowing can't save you from everything
+
+However, one area where Rust's type system doesn't do anything to help you is avoiding deadlocks.
+One can trivially perform one by acquiring two mutex's in different orders:
+
+```Rust
+use std::sync::Mutex;
+use std::thread::{scope, sleep_ms};
+
+fn main() {
+    let m1 = Mutex::new(());
+    let m2 = Mutex::new(());
+
+    scope(|s| {
+        s.spawn(|| {
+            let g1 = m1.lock();
+            sleep_ms(100);
+            println!("t1: got m1, trying to get m2");
+            let g2 = m2.lock();
+            println!("t1: got both");
+        });
+
+        s.spawn(|| {
+            let g2 = m2.lock();
+            sleep_ms(100);
+            println!("t2: got m2, trying to get m1");
+            let g1 = m1.lock();
+            println!("t2: got both");
+        });
+    });
+}
+```
+
+While this example is obviously contrived, it demonstrates an important point.
+Rust deadlocks have come up in practice, and are usually much more subtle than this
+[@snoyman_deadlock; @fasterthanlime_deadlock].
+
+## Behaviour-Oriented Concurrency
+
+Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm
+[@when_concurrency_matters]. It has 2 key components:
+
+- **Cowns**: A cown (short for concurrent owner) is a piece of data.
+
+    A cown can be in one of two states: available or acquired. An available
+    cown is eligible to be acquired by a behaviour, but it's associated data
+    cannot be accessed. An acquired cown can have it's data accessed, but only
+    while it's aquired.
+
+    The only way to acquire a cown (and thus access it's) is to run a behaviour on it.
+
+- **Behaviours**: A behaviour is a unit of execution that acts upon a set of cowns.
+
+    When you create a behaviour, you give the set of cowns it acts on, as well as
+    the code to run. When all the required cowns can be acquired, the code is executed, and then
+    the cowns are made available again.
+
+    Cowns can only be acquired by one behaviour at once. This can be thaugh of as being a bit
+    like each Cown having a mutex, which is locked before the behaviour starts and unlocked after
+    it ends. However, every cown in a behaviour is acquired "at once"
+
+    Note that this means that creating a behaviour returns immediately, and the code inside
+    will be executed at some indetermined future point, when unique access to all cowns can
+    be guaranteed.
+
+
+```scala
+var myCown: Cown[int] = cown.create(10);
+
+when(myCown) {
+    myCown += 10;    
+}
+
+myCown += 10; // invalid.
+```
+
+BoC is both *data-race free* and *deadlock free*. No data races can occur, as
+cowns can only be modified when acquired by behaviours,
+
+## Verona Runtime
+
+The verona runtime (sometimes also known as `verona-rt`) is a C++ library that
+implements behaviour oriented concurrency. It is intended to be a part of the
+currently in development Verona language, but it can also be used as a
+freestanding C++ library today.
+
+It uses the C++ type system to enforse the destinction between availible and 
+aquired cowns. The `cown_ptr<T>` type references a cown containing `T`, but doens't
+allow accessing the data. Instead, when a behaviour executed, it's given an `acquired_cown<T>`, 
+which can access the underlying data.
+
+Internally, these have the same representation, but. An `acquired_cown<T>` is
+only handed out when the behavior runs. In this way, the compiler can enforce that
+cowns can only have their data accessed when acquired. Eg:
+
+```cpp
+cown_ptr<int> my_cown = make_cown<int>(10);
+when(my_cown) << [](acquired_cown<int> my_cown) {
+    my_cown += 10; // this works fine, via operator overloading.
+};
+my_cown += 10; // compiler error!
+```
+
+The `when` function takes a `cown_ptr`, and a lambda that takes an `acquired_cown`.
+When the cown can be acquired, it creates an `acquired_cown` (which cannot be done outside the verona-rt library),
+and passes that to the lambda. 
+
+However, a determined user can circumvent this type safety. As one example:
+
+```cpp
+cown_ptr<int> my_cown = make_cown<int>(10);
+int* escape_data;
+when(my_cown) << [&escape_data](acquired_cown<int> my_cown) {
+    escape_data = &*my_cown;
+};
+sleep(3); // Wait for behaviour to run
+*escape_data += 10; // Modifies cown without acquiring!!!
+```
+
+This exposes the underlying data via `escape_data`. A user could then
+modify the cowns data without acquiring it, undermining BoC's goal
+of no-data-races. This is because C++ has no mechanism to limit
+how long a pointer can be used, and the `acquired_cown` class
+must give out pointers to allow access to the underlying data.
+
+Rust can solve this with the power of lifetimes.
+
+<!--
+### Other concurrency paradimes
+
+- Shared Memory
+- Message Passing
+- Fork/Join
+- Actors
+- Structured Concurrency
+-->
+
+# Design
 
 ## Cowns {#design-cowns}
+
+The design of the Rust `Cown` API is as follows [^phantom]: 
+
+[^phantom]: `Cown` also has a `_marker: PhantomData<Mutex<T>>` field, but that's
+    not relavent here.
+
+```rust
+pub struct Cown<T> {
+   cown_ptr: CownPtr,
+}
+
+#[repr(transparent)]
+pub struct CownPtr {
+   addr: *mut (),
+}
+```
+
+![](./diagram/cown-layout.png)
 
 ## Behaviours {#design-behaviours}
 
@@ -67,15 +399,8 @@ where
 
 ## Scheduler
 
-# Implementation Chalenges
 
-## Allocation Size Couroption
-
-## TLS Destructors
-
-# Evaluation
-
-## Benchmarks
+# Performance Evaluation.
 
 One important metric to evaluate the project on is performance. As discussed previously (§\ref{design-cowns}), it's not simple to call into the C++ runtime from rust, and I had to be somewhat indirect due to the FFI boundary. I wanted to measure the performance overhead of this, versus C++ code that can call it directly. 
 
@@ -83,18 +408,14 @@ Note: In all benchmarks below, `Rust` indicates using my `boxcars` library, wher
 
 All graphs were created using the excellent [`criterion`](https://github.com/bheisler/criterion.rs) (TODO: Cite?) library.
 
-### Microbenchmarks
+## Microbenchmarks
 
 The first way to try to understand this would be with small microbenchmarks that
 do just one thing. This would let us get a direct comparison for exactly
 equivalent actions.
 
-#### Creating Cowns
+### Creating Cowns
 
-
-```{=latex}
-\mbox{}\\
-```
 
 ![](./img/Create_Cowns.svg)
 
@@ -124,12 +445,7 @@ for (size_t i = 0; i < n; i++)
 
 This overhead is measurable, but relatively small, with it only being 0.03ms when creating $2^{15}$ `Cown`s.
 
-#### Scheduling behaviours
-
-
-```{=latex}
-\mbox{}\\
-```
+### Scheduling behaviours
 
 ![](./img/Schedule_Behaviours.svg)
 
@@ -162,7 +478,7 @@ for (int j = 0; j < n; j++)
 ```
 
 
-#### Setting up scheduler
+### Setting up scheduler
 
 ```{=latex}
 \mbox{}\\
@@ -191,7 +507,7 @@ Scheduler::get().run();
 ```
 
 
-#### Busy looping
+### Busy looping
 
 
 ![](./img/Busy_Loop.svg)
@@ -228,7 +544,7 @@ auto c = make_cown<size_t>(nsecs);
 when(c) << [](auto c) { busy_loop(*c); };    
 ```
 
-### Larger Benchmarks
+## Larger Benchmarks
 
 Performance is kind of mixed.
 
@@ -236,13 +552,13 @@ Performance is kind of mixed.
 ![](./img/savina_Barber.svg)
 ![](./img/Fibonacci.svg)
 
-## User Experience
+# Evaluation of User Experience
 
 Of course, performance isn't the only thing worth measuring. It's also worth
 considering what it's like to *use* these libraries, and how the language and
 API differences impact what it's like to write BoC code in them.
 
-### Parial Borrows
+## Parial Borrows
 
 Most of the type `AcquiredCown<'a, T>` acts like `&'a mut T`, and users don't have to worry about the fact that it's actually a smart pointer wrapper.
 
@@ -362,7 +678,7 @@ Therefor I decided not to make this change, as while it does make partial
 borrows nicer, they can already be done with clunkier syntax, and it would mean
 giving up on important functionality.
 
-### Compiler Errors
+## Compiler Errors
 
 Because Rust checks generics at the call site, rather than using template
 expansion, is can often produce much nicer error messages than the equivalent
@@ -370,7 +686,7 @@ from C++.
 
 (Note: comparing `g++ 13.2.0` to `rustc 1.78.0`)
 
-#### Wrong Cown constructor.
+### Wrong Cown constructor.
 
 The most frequently encountered one of these when writing the benchmarks was getting 
 
@@ -457,7 +773,7 @@ For more information about this error, try `rustc --explain E0308`.
 Which is much more understandable, as it doesn't need to take a detour through the templated libary code.
 <!-- TODO: More here about not needing std::forward -->
 
-#### Wrong Args
+### Wrong Args
 
 Another case to consider is getting the arguments to the behaviour wrong.
 
@@ -519,7 +835,7 @@ note: required by a bound in `when`
 For more information about this error, try `rustc --explain E0631`.
 ```
 
-#### Rustc being helpfull and unhelpfull
+### Rustc being helpfull and unhelpfull
 
 ```rust
 let foo = Cown::new(101);
@@ -620,7 +936,7 @@ can't say what type it needs to be, only that it must implement a certain trait.
 This also causes a followup error, where it claims that the function has the
 wrong signature, because it can't find the correct one.
 
-### auto-copy vs explicit clone.
+## auto-copy vs explicit clone.
 
 In C++, the `cown_ptr` class overloads it's copy and assignment constructor to automaticly update the reference count:
 

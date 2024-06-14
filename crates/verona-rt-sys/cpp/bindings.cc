@@ -54,7 +54,7 @@ namespace bench
     }
   }
 
-  void parallel_fib_into_carefull(uint32_t n, cown_ptr<uint32_t>& result)
+  void parallel_fib_into_careful(uint32_t n, cown_ptr<uint32_t>& result)
   {
     if (n <= 4)
     {
@@ -63,8 +63,8 @@ namespace bench
     else
     {
       auto f1 = make_cown<uint32_t>(0);
-      parallel_fib_into_carefull(n - 1, f1);
-      parallel_fib_into_carefull(n - 2, result);
+      parallel_fib_into_careful(n - 1, f1);
+      parallel_fib_into_careful(n - 2, result);
       when(result, f1) << [](auto r, auto f) { *r += f; };
     }
   }
@@ -453,16 +453,16 @@ extern "C"
       // a short while for more destructors/gc to run on other threads.
       //
       // This is terrible practice to use sleep for sync, but in this case we've
-      // already goofed, and it's usefull to know if the leaks are due to some
-      // race condition here. Origionally added for #21, we'll see if it
+      // already goofed, and it's useful to know if the leaks are due to some
+      // race condition here. Originally added for #21, we'll see if it
       // remains.
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       if (!get_has_leaks())
       {
 #ifdef SNMALLOC_TRACING
-        snmalloc::message<1024>("!! Double jeopardy found leaks disapearing??");
+        snmalloc::message<1024>("!! Double jeopardy found leaks disappearing?");
 #endif
-        std::cerr << "??? leaks disapeared by magic???" << std::endl;
+        std::cerr << "??? leaks disappeared by magic???" << std::endl;
 
 #ifdef USE_FLIGHT_RECORDER
         Logging::SysLog::dump_flight_recorder();
@@ -682,7 +682,7 @@ extern "C"
     Scheduler::get().run();
   }
 
-  void bbench_do_par_fib_carefull(uint32_t n, uint32_t exp, uint64_t iters)
+  void bbench_do_par_fib_careful(uint32_t n, uint32_t exp, uint64_t iters)
   {
     Scheduler::get().init(1);
 
@@ -690,7 +690,7 @@ extern "C"
 
     for (int i = 0; i < iters; i++)
     {
-      bench::parallel_fib_into_carefull(n, r);
+      bench::parallel_fib_into_careful(n, r);
       when(r) << [exp](auto r) {
         if (r != exp)
           abort();

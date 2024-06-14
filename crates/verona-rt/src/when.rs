@@ -282,8 +282,8 @@ mod tests {
         bars.1.wait();
         // At some point here, we start running dtor for droptrack.
         bars.2.wait();
-        // but it's definatly done here, as we've run t2, which must be after t1, as they
-        // both aquire c_bars.
+        // but it's definitely done here, as we've run t2, which must be after t1, as they
+        // both acquire c_bars.
         assert_eq!(*dropstate.lock().unwrap(), true);
 
         jh.join().unwrap();
@@ -299,7 +299,7 @@ mod tests {
             Barrier::new(2),
         ));
         let bars_ = Arc::clone(&bars);
-        let is_droped = move || *dropstate.lock().unwrap();
+        let is_dropped = move || *dropstate.lock().unwrap();
 
         let in_sched = || {
             let c_main = Cown::new(droptrack);
@@ -327,15 +327,15 @@ mod tests {
         };
         let jh = thread::spawn(|| scheduler::with_leak_detector(in_sched));
 
-        assert_eq!(is_droped(), false);
+        assert_eq!(is_dropped(), false);
         bars.0.wait();
-        assert_eq!(is_droped(), false);
+        assert_eq!(is_dropped(), false);
         bars.1.wait();
-        assert_eq!(is_droped(), false);
+        assert_eq!(is_dropped(), false);
         bars.2.wait();
         // t2 is over here, but we've not started t3, so unknown if drop has run
         bars.3.wait();
-        assert_eq!(is_droped(), true, "cown should still be alive here");
+        assert_eq!(is_dropped(), true, "cown should still be alive here");
 
         jh.join().unwrap();
     }

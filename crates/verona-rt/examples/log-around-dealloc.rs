@@ -11,12 +11,12 @@ fn main() {
     with_scheduler(|| {
         log(c"TOP");
         let v1 = Cown::new(10);
-        log(c"Just alloced");
+        log(c"Just allocated");
         let v2 = v1.clone();
         log(c"Just cloned");
         drop(v1);
-        log(c"droped v1");
+        log(c"dropped v1");
         drop(v2);
-        log(c"droped v2");
+        log(c"dropped v2");
     });
 }

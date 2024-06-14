@@ -64,7 +64,7 @@ extern "C" {
     fn bbench_create_n_cowns(n: usize);
     fn bbench_schedule_n_lambdas_onto_cown(n: usize, iters: u64);
     fn bbench_do_par_fib(n: u32, exp: u32, iters: u64);
-    fn bbench_do_par_fib_carefull(n: u32, exp: u32, iters: u64);
+    fn bbench_do_par_fib_careful(n: u32, exp: u32, iters: u64);
 
     fn bbench_busyloop_inside_when(usecs: usize, iters: u64);
     fn boxcars_busy_loop(usecs: usize);
@@ -282,7 +282,7 @@ fn time_fib(c: &mut Criterion) {
             });
         });
 
-        group.bench_with_input(BenchmarkId::new("Rust Uncarefull", i), &i, |b, n| {
+        group.bench_with_input(BenchmarkId::new("Rust Uncareful", i), &i, |b, n| {
             b.iter_custom(|iters| {
                 let exp = sequential_fib(*n);
 
@@ -303,12 +303,12 @@ fn time_fib(c: &mut Criterion) {
             });
         });
 
-        group.bench_with_input(BenchmarkId::new("C++ carefull", i), &i, |b, n| {
+        group.bench_with_input(BenchmarkId::new("C++ Careful", i), &i, |b, n| {
             b.iter_custom(|iters| {
                 let exp = sequential_fib(*n);
                 let start = Instant::now();
                 unsafe {
-                    bbench_do_par_fib_carefull(*n, exp, iters);
+                    bbench_do_par_fib_careful(*n, exp, iters);
                 }
                 start.elapsed()
             });

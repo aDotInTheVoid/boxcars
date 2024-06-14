@@ -53,7 +53,7 @@ impl CownPtr {
 /// `Corresponds to rt::Cown`.
 ///
 /// Rust code shouldn't inspect the contents of it, but use it for size/
-/// allignment/pointer arithmatic.
+/// allignment/pointer arithmetic.
 pub struct OpaqueCown {
     _marker: core::mem::MaybeUninit<[*const (); 3]>,
 }
@@ -98,7 +98,7 @@ extern "C" {
     ///   re-initializing the schedular.
     pub fn scheduler_run(schedular: Scheduler);
 
-    /// Extreamly racy.
+    /// Extremely racy.
     pub fn schedular_set_detect_leaks(detect_leaks: bool);
     pub fn schedular_has_leaks() -> bool;
 

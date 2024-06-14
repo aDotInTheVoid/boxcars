@@ -18,18 +18,19 @@ pub fn log(val: &'static core::ffi::CStr) {
 cargo run --example log-around-dealloc --features systematic_testing
 
 a TOP
-a Just alloced
+a Registeded cown at address 0
+a Just allocated
 a Shared 0 acquire
 a Just cloned
 a Shared 0 release
-a decref_shared 0x7f9e090a0020
-a droped v1
+a decref_shared 0x7f4a88510020
+a dropped v1
 a Shared 0 release
-a decref_shared 0x7f9e090a0020
-a decref_shared part 2 0x7f9e090a0020
+a decref_shared 0x7f4a88510020
+a decref_shared part 20x7f4a88510020
 a Cown 0 dealloc
 a Collecting cown 0
 a Cown 0 weak release
 a Cown 0 no references left.
-a droped v2
+a dropped v2
 */

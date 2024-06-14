@@ -57,7 +57,7 @@
 //! 5. *Run thread local destructors*: (Especially if using the leak-dececor), if you don't
 //!     ensure that `thread_local` destructors are run, you'll end up with racy false-positives.
 //!
-//!     Notably [`std::thread::scope`], doesn't gaurentee to run them [if you don't call `.join()`
+//!     Notably [`std::thread::scope`], doesn't guarantee to run them [if you don't call `.join()`
 //!     on the handles](https://github.com/rust-lang/rust/issues/116237). Thanks to Mara Bos for
 //!     pointing this out to me.
 

@@ -14,10 +14,10 @@ fn main() {
 
         let c1 = Cown::new(101);
 
-        log(c"made allocation, now droping");
+        log(c"made allocation, now dropping");
 
         drop(c1);
 
-        log(c"droped allocation");
+        log(c"dropped allocation");
     })
 }

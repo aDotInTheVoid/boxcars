@@ -38,6 +38,27 @@ Marios Kogias, Mathiew Parkinson, David Chisnall, Sylvan Clebsch, Mara Bos, Nora
 
 # Design
 
+```rust
+pub struct Cown<T> { ... }
+
+impl<T> Cown<T> {
+   pub fn new(value: T) -> Self { ... }
+}
+```
+
+```rust
+pub fn when1<Func, T: 'static>(cown: &Cown<T>, func: Func)
+where
+    Func: for<'a> FnOnce(AcquiredCown<'a, T>) + Send + 'static { ... }
+```
+
+```rust
+pub fn when<C, F>(cowns: C, func: F)
+where
+    C: CownCollection,
+    F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
+```
+
 ## Cowns {#design-cowns}
 
 ## Behaviours {#design-behaviours}
@@ -647,5 +668,8 @@ This adds visual clutter but also means that it's clearer when you're paying to
 cost to do reference counting.
 
 # Future Works
+
+- Large scale software in BoC
+- Passing datatypes between C++ and Rust.
 
 # References

@@ -53,20 +53,18 @@ unsafe fn make_aq<'a, T>(aq: &ffi::Slot) -> AcquiredCown<'a, T> {
 macro_rules! one_when {
     (
         $whenfunc:ident
-        $usefunc:ident
-        $tramp_name:ident
         <
-        $($gty:ident $glife:lifetime $cname:ident $idx:literal),+
+        $($gty:ident $cname:ident $idx:literal),+
         >
     ) => {
         pub fn $whenfunc
-            <Func, $($gty : 'static ),+>
-        ($($cname: &Cown<$gty>),+, func: Func)
+            <F, $($gty : 'static),+>
+        ($($cname: &Cown<$gty>),+, func: F)
             where
-                Func: for <$($glife),+> FnOnce( $(AcquiredCown<$glife, $gty>),+)
+                F: for <'a> FnOnce( $(AcquiredCown<'a, $gty>),+)
                     + Send + 'static
          {
-            let  cs = [$($cname.cown_ptr),+];
+            let cs = [$($cname.cown_ptr),+];
             assert!(is_unique(&cs), "Cowns not unique");
             $crate::schedule_lambda(
                 move |s| {
@@ -78,16 +76,15 @@ macro_rules! one_when {
     };
 }
 
-// TODO: Add when0
-one_when!(when1 Func1 t1 <A 'a cown0 0>);
-one_when!(when2 Func2 t2 <A 'a cown0 0, B 'b cown1 1>);
-one_when!(when3 Func3 t3 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2>);
-one_when!(when4 Func4 t4 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3>);
-one_when!(when5 Func5 t5 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4>);
-one_when!(when6 Func6 t6 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5>);
-one_when!(when7 Func7 t7 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6>);
-one_when!(when8 Func8 t8 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7>);
-one_when!(when9 Func9 t9 <A 'a cown0 0, B 'b cown1 1, C 'c cown2 2, D 'd cown3 3, E 'e cown4 4, F 'f cown5 5, G 'g cown6 6, H 'h cown7 7, I 'i cown8 8>);
+one_when!(when1 <T cown 0>);
+one_when!(when2 <T cown0 0, U cown1 1>);
+one_when!(when3 <T cown0 0, U cown1 1, V cown2 2>);
+one_when!(when4 <T cown0 0, U cown1 1, V cown2 2, W cown3 3>);
+one_when!(when5 <T cown0 0, U cown1 1, V cown2 2, W cown3 3, X cown4 4>);
+one_when!(when6 <T cown0 0, U cown1 1, V cown2 2, W cown3 3, X cown4 4, Y cown5 5>);
+one_when!(when7 <T cown0 0, U cown1 1, V cown2 2, W cown3 3, X cown4 4, Y cown5 5, Z cown6 6>);
+one_when!(when8 <T cown0 0, U cown1 1, V cown2 2, W cown3 3, X cown4 4, Y cown5 5, Z cown6 6, H cown7 7>);
+one_when!(when9 <T cown0 0, U cown1 1, V cown2 2, W cown3 3, X cown4 4, Y cown5 5, Z cown6 6, H cown7 7, I cown8 8>);
 
 // FIXME: LLVM eat's shit on this codegen. https://godbolt.org/z/s9sqGqGbP
 fn is_unique<const N: usize>(cown: &[ffi::CownPtr; N]) -> bool {

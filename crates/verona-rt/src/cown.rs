@@ -4,6 +4,9 @@ use verona_rt_sys as ffi;
 
 use crate::descriptor::get_desc;
 
+/// A piece of concurrently owned data.
+///
+/// In order to access it, you must schedule a behaviour onto it with [`when`][crate::when()].
 pub struct Cown<T> {
     pub(crate) cown_ptr: ffi::CownPtr,
     // TODO: Is this right wrt send/sync.

@@ -1,3 +1,10 @@
+//! # Behavior Oriented Concurrency in Rust
+//!
+//! For an introduction to the Behavior Oriented Concurrency model, see the
+//! [OOPSLA 2023 Paper](https://dl.acm.org/doi/10.1145/3622852). This library
+//! aims to provide idiomatic Rust bindings to the [Verona runtime](https://github.com/microsoft/verona-rt),
+//! as introduced in that paper.
+//!
 //! ```rust
 //! # use verona_rt::*;
 //! # with_scheduler(|| {
@@ -26,25 +33,26 @@
 //!
 //! ## Current Status
 //!
-//! This is a research project, and is at an early stage of development. It is not
-//! ready for use outside of research.
+//! This is a research project. It is not ready for use outside of research.
 //!
 //! ## Restrictions:
 //!
 //! Note: This list in non-exhaustive. If you do anything weird, you may well
-//! get a crash deep inside the gut of verona-rt. That's not to say you shouldn't,
-//! just a warning about how robust this is at the moment. In fact, if you do
-//! discover something not listed here, please [let me know](https://github.com/aDotInTheVoid/boxcars/issues/new).
+//! get a crash deep inside the gut of verona-rt. That's not to say you
+//! shouldn't, just a warning about how robust this is at the moment. In fact,
+//! if you do discover something not listed here, please [let me
+//! know](https://github.com/aDotInTheVoid/boxcars/issues/new).
 //!
 //! 1. *Don't leak threads*: When the main thread finishes, all other threads
 //!    shut down. If you've accessed verona-rt resources in other threads,
 //!    you'll have a bad time.
-//! 2. *Run everything inside a schedular*: Use [`scheduler::with`] to set up and
+//! 2. *Run everything inside a schedular*: Use [`with_scheduler`] to set up and
 //!    tear down the global schedular state.
-//! 3. *Don't panic*: If you panic with the schedular, arbitrarily bad things happen.
+//! 3. *Don't panic*: If you panic with the schedular, arbitrarily bad things
+//!    happen.
 // !    I'm working on solving this, but it's on the backburner for now.
 //! 4. *Don't make a load of schedulers*: Everything should run with the same schedular.
-//!    If you call [`scheduler::with``] on a load of thread, your going to have a bad day
+//!    If you call [`with_scheduler``] on a load of thread, your going to have a bad day
 //!    (unless you like debugging non-reproducible segfaults :)).
 //! 5. *Run thread local destructors*: (Especially if using the leak-dececor), if you don't
 //!     ensure that `thread_local` destructors are run, you'll end up with racy false-positives.

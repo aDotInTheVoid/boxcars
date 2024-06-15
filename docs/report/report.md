@@ -34,12 +34,13 @@ The Rust programming language is pretty cool. However, it could be better.
 \begin{abstract}
 ```
 
-First, I must that my project supervisor Marios Kogias. He's done a fantastic
-job sheparding this project, letting me moprh it where
+First and foremost, I must thanks Marios Kogias for his excelent job as project
+supervisor.
 
 I'd also like to thank Mathiew Parkinson, David Chisnall, Sylvan Clebsch for
 providing critical feedback when presented with a much earlier version of the
-design, and point out to me 
+design, and pointing out a different direction to explore that ended up being
+much more fruitful than my initial attempts.
 
 Finally I'd like to thank Nora for pointing out to me how to make
 ThreadSanitizer work with Rust's standard library, and Mara Bos for chiming in
@@ -57,19 +58,23 @@ destructors.
 
 # Introduction
 
-XXX
+Foo
 
-```cpp {.cpp, style="boxed"}
+```cpp {caption="The Bar Code!" label="foo"}
 int main() {
     std::cout << "Lol";
 }
 ```
+
+Listing \ref{foo}
 
 ```rust
 fn main() {
   dbg!(2+2);
 }
 ```
+
+Bar Baz!
 
 ## Why
 

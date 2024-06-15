@@ -1,17 +1,22 @@
 gather:
     ./gather_imgs.sh
 
-html: report_html
-report_html:
+html:
     pandoc report.md -so report.html --citeproc
 
-pdf: report_pdf
-report_pdf:
-    pandoc report.md -o report.pdf --pdf-engine=xelatex --citeproc
+# Build report TeX sources
+tex:
+    mkdir -p dist
+    pandoc report.md -so dist/report.tex --pdf-engine=xelatex --citeproc --lua-filter=minted.lua
 
-tex: report_tex
-report_tex:
-    pandoc report.md -so report.tex --pdf-engine=xelatex --citeproc
+# Build report PDF
+pdf: tex
+    latexmk
+
+# Remove build artifacts
+clean:
+    rm -rf ./dist
+    rm -rf ./svg-inkscape
 
 longbench:
     cargo bench -p verona-rt --bench micro -- --test

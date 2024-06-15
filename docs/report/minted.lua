@@ -1,4 +1,7 @@
 --[[
+https://github.com/pandoc/lua-filters/blob/53f3c1c50caca9b4312f1c746c2993cef085d5d7/minted/minted.lua
+Modified 2024 by Alona EM
+
 minted -- enable the minted environment for code listings in beamer and latex.
 
 MIT License
@@ -155,7 +158,9 @@ local function is_minted_class(cls)
     "encoding", "escapeinside", "firstline", "firstnumber", "fontfamily",
     "fontseries", "fontsize", "fontshape", "formatcom", "frame", "framerule",
     "framesep", "funcnamehighlighting", "gobble", "highlightcolor",
-    "highlightlines", "keywordcase", "label", "labelposition", "lastline",
+    "highlightlines", "keywordcase", 
+    -- Alona(2024-06-15): Remove `label`, as we add it later.
+    "labelposition", "lastline",
     "linenos", "numberfirstline", "numbers", "mathescape", "numberblanklines",
     "numbersep", "obeytabs", "outencoding", "python3", "resetmargins",
     "rulecolor", "samepage", "showspaces", "showtabs", "space", "spacecolor",
@@ -404,12 +409,24 @@ function CodeBlock(block)
   if FORMAT == "beamer" or FORMAT == "latex" then
     local language   = minted_language(block, MintedBlock)
     local attributes = minted_attributes(block, MintedBlock)
-    local raw_minted = string.format(
-      "\\begin{minted}[%s]{%s}\n%s\n\\end{minted}",
+    local minted_inner = string.format(
+      "\\begin{minted}[%s]{%s}\n%s\n\\end{minted}\n",
       attributes,
       language,
       block.text
     )
+
+    -- Alona(2024-06-15): Use a listing here.
+    local raw_minted = "\\begin{listing}[h]\n"
+    if block.attributes.label then
+      raw_minted = string.format("%s\\label{%s}\n", raw_minted, block.attributes.label)
+    end
+    if block.attributes.caption then
+      raw_minted = string.format("%s\\caption{%s}\n", raw_minted, block.attributes.caption)
+    end
+    raw_minted = raw_minted .. minted_inner
+    raw_minted = raw_minted .. "\\end{listing}\n"
+
     -- NOTE: prior to pandoc commit 24a0d61, `beamer` cannot be used as the
     -- RawBlock format.  Using `latex` should not cause any problems.
     return pandoc.RawBlock("latex", raw_minted)

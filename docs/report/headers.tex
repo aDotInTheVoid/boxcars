@@ -5,4 +5,13 @@
 % Let us access `\date' and `\title' in title.tex
 \usepackage{authoraftertitle} 
 
+\usepackage[outputdir=dist]{minted}
+
+\usepackage{tcolorbox}
+\usepackage{etoolbox}
+\BeforeBeginEnvironment{minted}{\begin{tcolorbox}}%
+\AfterEndEnvironment{minted}{\end{tcolorbox}}%
+
+
+
 % END headers.tex

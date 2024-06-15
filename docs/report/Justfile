@@ -1,9 +1,6 @@
 gather:
     ./gather_imgs.sh
 
-html:
-    pandoc report.md -so report.html --citeproc
-
 # Build report TeX sources
 tex:
     mkdir -p dist

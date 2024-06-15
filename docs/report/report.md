@@ -645,9 +645,8 @@ However, because this means that the compiller will implicity insert calls to ou
 [^borrow_cant_see_into]: Remember, when checking a function, the borrow-checker
     can't see the bodies of other functions, only their signatures.
 
-Consider the following code:
 
-```rust
+```rust {label="code:partial-works" caption="Demonstration of partial borrowing"}
 struct Foo {
     a: i32,
     b: i32,
@@ -662,20 +661,22 @@ let mut foo = Foo { a: 1, b: 1 };
 use_ints(&mut foo.a, &mut foo.b);
 ```
 
-On the last line, `foo` is borrowed mutably twice. However, because these are
-both borrows of different fields of `foo`, neither one aliases with each other,
-so we haven't violated the core principle of Aliasing XOR Mutation. This feature, where you can borrow single fields of a struct without borrowing the whole struct, is called partial borrows [@nomicon].
+On the last line of \ref{code:partial-works}, `foo` is borrowed mutably twice.
+However, because these are both borrows of different fields of `foo`, neither
+one aliases with each other, so we haven't violated the core principle of
+Aliasing XOR Mutation. This feature, where you can borrow single fields of a
+struct without borrowing the whole struct, is called partial borrows [@nomicon].
 
 However, when we attempt this same thing on a `AcquiredCown<Foo>`, it doesn't work:
 
-```rust
+```rust {label="needs-partial" caption="Attempting to borrow two fields of a struct in a cown."}
 let cown = Cown::new(Foo { a: 1, b: 1 });
 when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
     use_ints(&mut acq_cown.a, &mut acq_cown.b)
 });
 ```
 
-```
+```{caption="Compiller error of listing \ref{needs-partial}"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
   --> tests/ui/partial-borrow.rs:17:44
    |

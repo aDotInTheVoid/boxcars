@@ -423,7 +423,7 @@ function CodeBlock(block)
     local s_label = block.attributes.label 
 
     -- It's important to put `caption` here first, as it advances the label counter.
-    if s_caption and s_label then
+    if s_caption then
       r = r .. string.format("\\caption{%s}\n", s_caption)
     end
     if s_label then

@@ -160,6 +160,7 @@ local function is_minted_class(cls)
     "framesep", "funcnamehighlighting", "gobble", "highlightcolor",
     "highlightlines", "keywordcase", 
     -- Alona(2024-06-15): Remove `label`, as we add it later.
+    "label",
     "labelposition", "lastline",
     "linenos", "numberfirstline", "numbers", "mathescape", "numberblanklines",
     "numbersep", "obeytabs", "outencoding", "python3", "resetmargins",
@@ -417,19 +418,26 @@ function CodeBlock(block)
     )
 
     -- Alona(2024-06-15): Use a listing here.
-    local raw_minted = "\\begin{listing}[h]\n"
-    if block.attributes.label then
-      raw_minted = string.format("%s\\label{%s}\n", raw_minted, block.attributes.label)
+    local r = "\\begin{listing}[ht]\n"
+    local s_caption = block.attributes.caption
+    local s_label = block.attributes.label 
+
+    -- It's important to put `caption` here first, as it advances the label counter.
+    if s_caption and s_label then
+      r = r .. string.format("\\caption{%s}\n", s_caption)
     end
-    if block.attributes.caption then
-      raw_minted = string.format("%s\\caption{%s}\n", raw_minted, block.attributes.caption)
+    if s_label then
+      r = r .. string.format("\\label{%s}\n", s_label)
+      if not s_caption then
+        warn("got label for code listing without caption, this wont work. seach for NO_CAPTION_HERE in tex output").
+        r = r .. "% NO_CAPTION_HERE\n"
+      end
     end
-    raw_minted = raw_minted .. minted_inner
-    raw_minted = raw_minted .. "\\end{listing}\n"
+    r = r .. minted_inner .. "\\end{listing}\n"
 
     -- NOTE: prior to pandoc commit 24a0d61, `beamer` cannot be used as the
     -- RawBlock format.  Using `latex` should not cause any problems.
-    return pandoc.RawBlock("latex", raw_minted)
+    return pandoc.RawBlock("latex", r)
   else
     return remove_minted_attibutes(block)
   end

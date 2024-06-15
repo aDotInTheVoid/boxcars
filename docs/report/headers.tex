@@ -2,16 +2,30 @@
 
 % Supress the default titlepage.
 \renewcommand{\maketitle}{} 
+
 % Let us access `\date' and `\title' in title.tex
+% https://tex.stackexchange.com/a/120597
 \usepackage{authoraftertitle} 
 
+% https://tex.stackexchange.com/a/339933
 \usepackage[outputdir=dist]{minted}
 
+% https://tex.stackexchange.com/a/426771
+% Use per-chapter listings.
+\counterwithin{listing}{chapter}
+
+% Make minted use box around code.
+% https://tex.stackexchange.com/a/112573
 \usepackage{tcolorbox}
 \usepackage{etoolbox}
 \BeforeBeginEnvironment{minted}{\begin{tcolorbox}}%
 \AfterEndEnvironment{minted}{\end{tcolorbox}}%
 
+% Set fonts.
+\usepackage{libertine}
+\usepackage[scale=0.9]{sourcecodepro}
 
+\usepackage{caption}
+\captionsetup{margin=5pt,labelfont=bf}
 
 % END headers.tex

@@ -6,9 +6,7 @@ bibliography: ../cites.bib
 csl: https://raw.githubusercontent.com/citation-style-language/styles/master/vancouver.csl
 link-citations: true
 papersize: a4
-geometry: margin=3cm
-mainfont: CMU Serif
-monofont: inconsolata
+geometry: a4paper,hmargin=2.8cm,vmargin=2.0cm,includeheadfoot
 toc: false # We insert the TOC ourselves, after the abstact and acknoledgements.
 toc-depth: 2
 colorlinks: true
@@ -26,7 +24,7 @@ header-includes: |
 \begin{abstract}
 ```
 
-The Rust programming language is pretty cool. However, it could be better.
+The Rust programming language is pretty cool. However, it could be better. What if it was good?
 
 ```{=latex}
 \end{abstract}
@@ -58,23 +56,20 @@ destructors.
 
 # Introduction
 
-Foo
+Help!!!
 
-```cpp {caption="The Bar Code!" label="foo"}
+```cpp {caption="Foo Code" label="code:foo"}
 int main() {
     std::cout << "Lol";
 }
 ```
 
-Listing \ref{foo}
-
-```rust
-fn main() {
-  dbg!(2+2);
-}
+```java {caption="Bar Code" label="code:bar"}
+class Bar {}
 ```
 
-Bar Baz!
+Foo = \ref{code:foo}. Bar = \ref{code:bar}.
+
 
 ## Why
 
@@ -610,24 +605,39 @@ API differences impact what it's like to write BoC code in them.
 
 ## Parial Borrows
 
-Most of the type `AcquiredCown<'a, T>` acts like `&'a mut T`, and users don't have to worry about the fact that it's actually a smart pointer wrapper.
+While most of the time `AcquiredCown<'a, T>` acts like a transparent wrapper
+over `&'a mut T`, there are some cases where this abstraction becomes leaky, and
+users need to be aware that they're not dealing with a normal reference.  
 
-```rust
-fn print_str(s: &str) {
-    println!("{s}");
-}
 
-let cown = Cown::<&str>::new("hello world");
-when(&cown, |acq_cown: AcquiredCown<&str>| {
-    print_str(&acq_cown);
-});
+```rust {label="autoderef-example" caption="Demonstration of auto-deref"}
+    let cown = Cown::<i32>::new(10);
+
+    // This type anotation isn't needed, but is here to make the coercion clearer.
+    //                     vv
+    when(&cown, |acq_cown: AcquiredCown<i32>| {
+        let n: i32 = *acq_cown; 
+    });
 ```
 
-This is done by implementing the
-[`std::operator::Deref`](https://doc.rust-lang.org/stable/std/ops/trait.Deref.html)
-and [`DerefMut`](https://doc.rust-lang.org/stable/std/ops/trait.DerefMut.html)
-trait. This is broadly equivalent to `verona::cpp::acquired_cown` overloading
-`operator->`, `operator*` and `operator T&`.
+In code like that in listing \ref{autoderef-example}, `acq_cown` acts like an `&mut i32`, and is able to be dereferenced into `i32`. This even extends to method calls, as shown in listing \ref{autoderef-methods}, where we can call `&str`s `to_uppercase` method on an `AcquiredCown<&str>`.
+
+```rust {label="autoderef-methods" caption="Calling methods on acquired cowns via auto-deref"}
+    let cown = Cown::<&str>::new("hello");
+
+    when(&cown, |acq_cown: AcquiredCown<&str>| {
+        let uppercase_str = acq_cown.to_uppercase();
+    });
+```
+
+This is possible because `AcquiredCown` implements the
+[`Deref`](https://doc.rust-lang.org/stable/std/ops/trait.Deref.html) and
+[`DerefMut`](https://doc.rust-lang.org/stable/std/ops/trait.DerefMut.html)
+traits. The rust compiller will implicitly insert calls to these methods, to
+allow a `AcquiredCown<T>` to be treated like an `&mut T`. This normally works
+seamlessly, as shown in listings \ref{autoderef-example} and
+\ref{autoderef-methods}.
+
 
 However, because this means that the compiller will implicity insert calls to our `Deref` implemnations ("deref coercion" [@rust_book]), this makes things much harder for the borrow checker [^borrow_cant_see_into].
 

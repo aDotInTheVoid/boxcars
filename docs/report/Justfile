@@ -12,3 +12,7 @@ report_pdf:
 tex: report_tex
 report_tex:
     pandoc report.md -so report.tex --pdf-engine=xelatex --citeproc
+
+longbench:
+    cargo bench -p verona-rt --bench micro -- --test
+    cargo bench -p verona-rt --bench micro -- --measurement-time 200 --discard-baseline

@@ -15,7 +15,7 @@ for bname in \
     'Schedule Behaviours' \
     'Philosophers'
 do
-    cp "$criterion_dir/$bname/report/lines.svg" "./img/${bname// /_}.svg"
+    cp "$criterion_dir/$bname/report/lines.svg" "./bench_graphs/${bname// /_}.svg"
 done
 
 for bname in \
@@ -23,6 +23,6 @@ for bname in \
 	'savina_Barber' \
     'Scheduler'
 do
-	cp "$criterion_dir/$bname/report/violin.svg" "./img/${bname// / /_}.svg"
+	cp "$criterion_dir/$bname/report/violin.svg" "./bench_graphs/${bname// / /_}.svg"
 done
 

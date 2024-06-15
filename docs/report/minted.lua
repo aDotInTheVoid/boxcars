@@ -418,7 +418,8 @@ function CodeBlock(block)
     )
 
     -- Alona(2024-06-15): Use a listing here.
-    local r = "\\begin{listing}[ht]\n"
+    -- TODO: Use [h] instead?
+    local r = "\\begin{listing}[h]\n"
     local s_caption = block.attributes.caption
     local s_label = block.attributes.label 
 
@@ -429,7 +430,9 @@ function CodeBlock(block)
     if s_label then
       r = r .. string.format("\\label{%s}\n", s_label)
       if not s_caption then
-        warn("got label for code listing without caption, this wont work. seach for NO_CAPTION_HERE in tex output").
+        -- On pandoc < 3.2 pandoc.log doesn't exist defined.
+        -- However, that just means we error, because late-resolution lol. 
+        pandoc.log.warn("got label for code listing without caption, this wont work. seach for NO_CAPTION_HERE in tex output")
         r = r .. "% NO_CAPTION_HERE\n"
       end
     end

@@ -18,7 +18,7 @@
 % https://tex.stackexchange.com/a/112573
 \usepackage{tcolorbox}
 \usepackage{etoolbox}
-\BeforeBeginEnvironment{minted}{\begin{tcolorbox}}%
+\BeforeBeginEnvironment{minted}{\begin{tcolorbox}[left=1mm, right=1mm]}%
 \AfterEndEnvironment{minted}{\end{tcolorbox}}%
 
 % Set fonts.

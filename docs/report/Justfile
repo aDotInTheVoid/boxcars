@@ -4,7 +4,7 @@ gather:
 # Build report TeX sources
 tex:
     mkdir -p dist
-    pandoc report.md -so dist/report.tex --pdf-engine=xelatex --citeproc --lua-filter=minted.lua
+    pandoc report.md -so dist/report.tex --pdf-engine=xelatex --citeproc --lua-filter=minted.lua --fail-if-warnings 
 
 # Build report PDF
 pdf: tex

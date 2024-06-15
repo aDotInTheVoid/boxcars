@@ -6,12 +6,15 @@ bibliography: ../cites.bib
 csl: https://raw.githubusercontent.com/citation-style-language/styles/master/vancouver.csl
 link-citations: true
 papersize: a4
-geometry: a4paper,hmargin=2.8cm,vmargin=2.0cm,includeheadfoot
+geometry: a4paper,includeheadfoot,driver=xetex,twoside,hmargin=2.25cm,vmargin=1cm
+# geometry: a4paper,hmargin=2.8cm,vmargin=1.0cm,includeheadfoot
 toc: false # We insert the TOC ourselves, after the abstact and acknoledgements.
 toc-depth: 2
 colorlinks: true
 numbersections: true
 documentclass: report
+classoption:
+  - twoside
 header-includes: |
   ```{=latex}
   \input{headers.tex}
@@ -24,7 +27,27 @@ header-includes: |
 \begin{abstract}
 ```
 
-The Rust programming language is pretty cool. However, it could be better. What if it was good?
+The **Rust** programming language offers extensive support for concurrent and
+parallel programming. While Rust is shown be memory safe and datarace free,
+it is not deadlock free.
+
+**Behaviour-Oriented Concurrency** is a novel paradigm that extends the actor
+model to allow atomicly sending messages to multiple actors. Behaviour-Oriented
+Concurrency is both datarace-free and deadlock-free. **`verona-rt`** is a C++
+library that provides an effient implementation of a runtime for
+behaviour-oriented concurrency.
+
+This project introduces the **`boxcars`** library, which allows using
+behaviour-oriented concurrency in Rust. It provides a idiomatic and type-safe
+wrapper over the runtime from `verona-rt`.
+
+We demonstrate that the `boxcars` API enforces the gaurenttes of
+behaviour-oriented concurrency in ways that `verona-rt` is unable to. We also
+demonstrate that by using `boxcars` (instead of Rust's included `std::sync`
+library) allows writing concurrent code that is deadlock-free by construction.
+Furthermore, we demonstrate that it imposes minimal overhead over using
+`verona-rt` directly.
+
 
 ```{=latex}
 \end{abstract}
@@ -33,9 +56,9 @@ The Rust programming language is pretty cool. However, it could be better. What 
 ```
 
 First and foremost, I must thanks Marios Kogias for his excelent job as project
-supervisor.
+supervisor. His advice and guidance thoughout the project have been stellar.
 
-I'd also like to thank Mathiew Parkinson, David Chisnall, Sylvan Clebsch for
+I'd also like to thank Matthew Parkinson, David Chisnall, and Sylvan Clebsch for
 providing critical feedback when presented with a much earlier version of the
 design, and pointing out a different direction to explore that ended up being
 much more fruitful than my initial attempts.
@@ -603,24 +626,27 @@ Of course, performance isn't the only thing worth measuring. It's also worth
 considering what it's like to *use* these libraries, and how the language and
 API differences impact what it's like to write BoC code in them.
 
-## Parial Borrows
+## Splitting Borrows of Fields Behind a Cown
 
 While most of the time `AcquiredCown<'a, T>` acts like a transparent wrapper
 over `&'a mut T`, there are some cases where this abstraction becomes leaky, and
-users need to be aware that they're not dealing with a normal reference.  
-
+users need to be aware that they're not dealing with a normal reference.
 
 ```rust {label="autoderef-example" caption="Demonstration of auto-deref"}
     let cown = Cown::<i32>::new(10);
 
-    // This type anotation isn't needed, but is here to make the coercion clearer.
-    //                     vv
+    // This type anotation isn't needed, but makes the coercion clearer
+    //                     vvvvvvvvvvvvvvvvv
     when(&cown, |acq_cown: AcquiredCown<i32>| {
         let n: i32 = *acq_cown; 
     });
 ```
 
-In code like that in listing \ref{autoderef-example}, `acq_cown` acts like an `&mut i32`, and is able to be dereferenced into `i32`. This even extends to method calls, as shown in listing \ref{autoderef-methods}, where we can call `&str`s `to_uppercase` method on an `AcquiredCown<&str>`.
+In code like that in listing \ref{autoderef-example}, `acq_cown` acts like an
+`&mut i32`, and is able to be dereferenced into `i32`. This even extends to
+method calls, as shown in listing \ref{autoderef-methods}, where we can call
+[`to_uppercase`](https://doc.rust-lang.org/1.79.0/std/primitive.str.html#method.to_uppercase)
+(a method defined on `&str`) on an `AcquiredCown<&str>`.
 
 ```rust {label="autoderef-methods" caption="Calling methods on acquired cowns via auto-deref"}
     let cown = Cown::<&str>::new("hello");
@@ -631,22 +657,14 @@ In code like that in listing \ref{autoderef-example}, `acq_cown` acts like an `&
 ```
 
 This is possible because `AcquiredCown` implements the
-[`Deref`](https://doc.rust-lang.org/stable/std/ops/trait.Deref.html) and
-[`DerefMut`](https://doc.rust-lang.org/stable/std/ops/trait.DerefMut.html)
-traits. The rust compiller will implicitly insert calls to these methods, to
+[`Deref`](https://doc.rust-lang.org/1.79.0/std/ops/trait.Deref.html) and
+[`DerefMut`](https://doc.rust-lang.org/1.79.0/std/ops/trait.DerefMut.html)
+traits. The rust compiller will implicitly insert calls to these traits' methods to
 allow a `AcquiredCown<T>` to be treated like an `&mut T`. This normally works
 seamlessly, as shown in listings \ref{autoderef-example} and
 \ref{autoderef-methods}.
 
-
-However, because this means that the compiller will implicity insert calls to our `Deref` implemnations ("deref coercion" [@rust_book]), this makes things much harder for the borrow checker [^borrow_cant_see_into].
-
-
-[^borrow_cant_see_into]: Remember, when checking a function, the borrow-checker
-    can't see the bodies of other functions, only their signatures.
-
-
-```rust {label="code:partial-works" caption="Demonstration of partial borrowing"}
+```rust {label="partial-works" caption="Demonstration of partial borrowing"}
 struct Foo {
     a: i32,
     b: i32,
@@ -661,45 +679,57 @@ let mut foo = Foo { a: 1, b: 1 };
 use_ints(&mut foo.a, &mut foo.b);
 ```
 
-On the last line of \ref{code:partial-works}, `foo` is borrowed mutably twice.
-However, because these are both borrows of different fields of `foo`, neither
-one aliases with each other, so we haven't violated the core principle of
-Aliasing XOR Mutation. This feature, where you can borrow single fields of a
-struct without borrowing the whole struct, is called partial borrows [@nomicon].
+However, this abstraction doesn't alway hold. The code in listing
+\ref{partial-works} compiles and executes successfully. Unfortunatly a naïve
+translation of this code to BoC (listing \ref{needs-partial}) fails to compile, giving the error shown in 
+\ref{multiborrow-error}.
 
-However, when we attempt this same thing on a `AcquiredCown<Foo>`, it doesn't work:
 
 ```rust {label="needs-partial" caption="Attempting to borrow two fields of a struct in a cown."}
 let cown = Cown::new(Foo { a: 1, b: 1 });
 when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
-    use_ints(&mut acq_cown.a, &mut acq_cown.b)
+  use_ints(&mut acq_cown.a, &mut acq_cown.b)
 });
 ```
 
-```{caption="Compiller error of listing \ref{needs-partial}"}
+```{caption="Compiller error of listing \ref{needs-partial}" label="multiborrow-error"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
-  --> tests/ui/partial-borrow.rs:17:44
-   |
-17 |     use_ints(&mut acq_cown.a, &mut acq_cown.b)
-   |     --------      --------         ^^^^^^^^ second mutable borrow occurs here
-   |     |             |
-   |     |             first mutable borrow occurs here
-   |     first borrow later used by call
+ --> crates/verona-rt/examples/play.rs:6:40
+  |
+6 |   use_ints(&mut acq_cown.a, &mut acq_cown.b)
+  |   --------      --------         ^^^^^^^^ second mutable borrow occurs here
+  |   |             |
+  |   |             first mutable borrow occurs here
+  |   first borrow later used by call
+
+For more information about this error, try `rustc --explain E0499`.
 ```
 
-Why is this? The compiller has implicitly inserted call to the `deref_mut` function to convert from `AcquiredCown<Foo>` to `&mut Foo`, so what the borrow checker runs on looks like:
+This occors because the compiller inserts calls to the the `deref_mut` method,
+to convert from `&mut AcquiredCown<Foo>` (which doesn't have fields `a` or `b`)
+to `&mut Foo` (which does). This happens both time `acq_cown` is dereferences,
+with the compiller desugaring it into the code given in listing \ref{autoderef-desugared}.
 
-```rust
+```rust {label="autoderef-desugared" caption="The desugaring of the call to \texttt{use_ints} in listing{needs-partial}"}
 use_ints(
     &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).a,
     &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).b,
 )
 ```
 
-Here it's clear that the problem is that both `deref_mut` calls *must* be able
-to borrow acq_cown, and indeed, that the error we get:
+This code has a compiller error (listing \ref{autoderef-desugared-err}), as it
+attempts to borrow `acq_cown` mutably twice. Why then does listing
+\ref{partial-works} compile, when it seemingly does the same thing? The answer
+is that the borrow checker is able to understand that we are borrowing disjoint fields of a struct, and therefor
+the borrows are not overlapping [@nomicon].
 
-```
+However, when borrowing from an `AcquiredCown<T>` (instead of a `&mut T`), we
+must first borrow the _entire_ cown to pass to the `deref_mut` method. Only then
+can we borrow the individual field that we want. At the time of the call the the
+`deref_mut` call, we have borrowed _all_ of `acq_cown`. Whereas in listing
+\ref{partial-works}, we never borrow all of `foo`, only it's invidual fields.
+
+```{caption="The compiller error from listing \ref{autoderef-desugared}" label="autoderef-desugared-err"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
   --> tests/ui/partial-borrow.rs:30:65
    |
@@ -711,33 +741,39 @@ error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
    |                                                      ^^^^^^^^^^^^^ second mutable borrow occurs here
 ```
 
-The borrow checker has no way of knowing (or isn't _allowed_) to know, that our
-`deref_mut` is just a pointer dereference, and that because we then access
-disjoint struct field, this should be allowed as a partial borrow.
 
-However, we can work around this:
+It is possible to work around this. As shown in
+\ref{partial-borrows-workaround}, one can instead first borrow the _entire_
+cown, and then borrow the fields on that.
 
-```rust
+```rust {label="partial-borrows-workaround" caption="Version of \ref{needs-partial} that compiles"}
 when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
     let mut_ref: &mut Foo = &mut *acq_cown;
     use_ints(&mut mut_ref.a, &mut mut_ref.b)
 });
 ```
 
-Here all the deref coersion happens on the second line, and it only happens once
-there to make `mut_ref`. Then on the third line, we partial borrow `mut_ref` to
-get the two fields we want. This is allowed, because there's no hidden function
-calls, so the borrow checker can locally check that we're obeying Aliasing XOR
-Mutation.
+Here, deref coersion only once, on the second line get `mut_ref`. Then on the
+third line, we partial can split the borrow on `mut_ref` to get the two fields
+we want. This is allowed, because there's no hidden function calls here, so the
+borrow checker can locally check that we're obeying Aliasing XOR Mutation.
 
-A potential workaround here would be to have the closure in `when` take `&mut T`
-instead of `AcquiredCown<T>`. This would make parial borrows work *by default*.
-However, this would mean that we'd loose the information that this was a
-reference to a cown (and not just any data). This is unfortunate, as that means
-we would no longer be able to schedule a new behaviour onto an acquired cown.
-Therefor I decided not to make this change, as while it does make partial
-borrows nicer, they can already be done with clunkier syntax, and it would mean
-giving up on important functionality.
+An alternative design that was considered was to have the closure in `when` be
+given `&mut T` (as oppsed to `AcquiredCown<T>`). This would alleviate the
+borrowing issues discussed above. However, it would mean that code such as
+listing \ref{why-acquiredcown} would cease to work, as we'd no longer store
+the information that the argument was a cown anywhere in the system, so it wouldn't
+be possible to schedule another behaviour onto it.
+
+
+```rust {label="why-acquiredcown" caption="Scheduling a new behaviour onto a cown acquired by another behaviour"}
+when((a, b), |(a, b)| {
+  do_something_with(a, b);
+  when(&a.cown(), |a| do_something_else_with(a));
+  when(&b.cown(), |b| do_a_third_thing_with(b));
+});
+```
+
 
 ## Compiler Errors
 

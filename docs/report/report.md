@@ -9,34 +9,79 @@ papersize: a4
 geometry: margin=3cm
 mainfont: CMU Serif
 monofont: inconsolata
-toc: true # TODO: Turn this false and place yourself.
+toc: false # We insert the TOC ourselves, after the abstact and acknoledgements.
 toc-depth: 2
 colorlinks: true
 numbersections: true
+documentclass: report
+header-includes: |
+  ```{=latex}
+  \input{headers.tex}
+  ```
 ---
 
 
-#### Acknowledgements
+```{=latex}
+\input{title.tex}
+\begin{abstract}
+```
 
-Marios Kogias, Mathiew Parkinson, David Chisnall, Sylvan Clebsch, Mara Bos, Nora
+The Rust programming language is pretty cool. However, it could be better.
 
-<!-- ```{=latex}
-% TODO: Use this to place TOC after abstract.
+```{=latex}
+\end{abstract}
+\renewcommand{\abstractname}{Acknowledgements}
+\begin{abstract}
+```
+
+First, I must that my project supervisor Marios Kogias. He's done a fantastic
+job sheparding this project, letting me moprh it where
+
+I'd also like to thank Mathiew Parkinson, David Chisnall, Sylvan Clebsch for
+providing critical feedback when presented with a much earlier version of the
+design, and point out to me 
+
+Finally I'd like to thank Nora for pointing out to me how to make
+ThreadSanitizer work with Rust's standard library, and Mara Bos for chiming in
+at the ideal time to point out a subtle interaction with thead-local
+destructors.
+
+```{=latex}
+\end{abstract}
 {
 \hypersetup{linkcolor=}
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
-``` -->
+```
 
 # Introduction
 
+XXX
+
+```cpp {.cpp, style="boxed"}
+int main() {
+    std::cout << "Lol";
+}
+```
+
+```rust
+fn main() {
+  dbg!(2+2);
+}
+```
+
+## Why
+
+
+
+## How?
 
 # Background
 
 ## Rust
 
-Rust [@rust_book] is a programming languages originally developed by Mozilla Research,
+Rust [@rust_book] is a programming language originally developed by Mozilla Research,
 and currently maintained by a large cross-org team.
 
 Rust's most important feature (for our purposes) is its system of **Ownership & Borrowing**.
@@ -130,7 +175,7 @@ I'd be recreating them from memory)
 
 https://matklad.github.io/2020/07/15/two-beautiful-programs.html
 
-```Rust
+```rust
 fn main() {
   let mut xs = vec![1, 2, 3];
   let x: &i32 = &xs[0];

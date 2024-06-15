@@ -436,7 +436,7 @@ pub struct CownPtr {
 }
 ```
 
-![](./diagram/cown-layout.png)
+![](./img/cown-layout.png)
 
 ## Behaviours {#design-behaviours}
 
@@ -462,7 +462,7 @@ equivalent actions.
 ### Creating Cowns
 
 
-![](./img/Create_Cowns.svg)
+![](./bench_graphs/Create_Cowns.svg)
 
 **Figure 1: Time to create $n$ cowns**
 
@@ -492,7 +492,7 @@ This overhead is measurable, but relatively small, with it only being 0.03ms whe
 
 ### Scheduling behaviours
 
-![](./img/Schedule_Behaviours.svg)
+![](./bench_graphs/Schedule_Behaviours.svg)
 
 **Figure 2: Time to schedule and run $n$ behaviours** 
 
@@ -529,7 +529,7 @@ for (int j = 0; j < n; j++)
 \mbox{}\\
 ```
 
-![](./img/Scheduler.svg)
+![](./bench_graphs/Scheduler.svg)
 
 **Figure 3: Time to create and run a scheduler doing nothing**
 
@@ -555,7 +555,7 @@ Scheduler::get().run();
 ### Busy looping
 
 
-![](./img/Busy_Loop.svg)
+![](./bench_graphs/Busy_Loop.svg)
 
 
 ```{=latex}
@@ -593,9 +593,9 @@ when(c) << [](auto c) { busy_loop(*c); };
 
 Performance is kind of mixed.
 
-![](./img/savina_Banking.svg)
-![](./img/savina_Barber.svg)
-![](./img/Fibonacci.svg)
+![](./bench_graphs/savina_Banking.svg)
+![](./bench_graphs/savina_Barber.svg)
+![](./bench_graphs/Fibonacci.svg)
 
 # Evaluation of User Experience
 

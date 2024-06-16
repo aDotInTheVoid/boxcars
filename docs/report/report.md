@@ -211,7 +211,7 @@ A value may have many shared references to it at a given time, but if it has any
 exclusive reference to it that reference must be the only one. With a shared
 reference, you can only read from the value. An exclusive reference is required
 to mutate it. More succinctly, Rust references are "Aliasable XOR mutable"
-[@boats_smaller]. The fact that a immutable reference can be shared, while a
+[@boats_smaller,@JungThesis]. The fact that a immutable reference can be shared, while a
 mutable reference must be exclusive has lead to these sometimes being call
 shared references (for `&T`) and exclusive references (for `&mut T`)
 [@dtolnay_ref].

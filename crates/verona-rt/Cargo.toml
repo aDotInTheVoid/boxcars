@@ -1,5 +1,6 @@
 [package]
-name = "verona-rt"
+# TODO: Rename folder, or rename back to verona-rt
+name = "boxcars"
 version = "0.0.2"
 edition = "2021"
 description = "Idiomatic binding to the verona runtime"

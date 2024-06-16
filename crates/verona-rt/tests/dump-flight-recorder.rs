@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use verona_rt::{log, with_scheduler};
+use boxcars::{log, with_scheduler};
 
 // cargo test --test dump-flight-recorder --features flight_recorder
 

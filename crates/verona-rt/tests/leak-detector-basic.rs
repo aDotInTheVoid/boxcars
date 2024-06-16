@@ -1,5 +1,5 @@
-use verona_rt::with_leak_detector;
-use verona_rt::Cown;
+use boxcars::with_leak_detector;
+use boxcars::Cown;
 
 use std::mem;
 

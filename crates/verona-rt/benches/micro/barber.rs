@@ -1,4 +1,4 @@
-use verona_rt::{when, with_scheduler, Cown};
+use boxcars::{when, with_scheduler, Cown};
 
 use stdx::rand::SimpleRand;
 

@@ -1,4 +1,4 @@
-use verona_rt::{with_leak_detector, Cown};
+use boxcars::{with_leak_detector, Cown};
 
 #[test]
 fn main() {

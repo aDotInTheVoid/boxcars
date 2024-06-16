@@ -1,6 +1,6 @@
 use verona_rt_sys as ffi;
 
-use verona_rt::{log, with_scheduler, Cown};
+use boxcars::{log, with_scheduler, Cown};
 
 fn main() {
     unsafe {

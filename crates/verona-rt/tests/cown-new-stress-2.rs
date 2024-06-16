@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
-use verona_rt::log_snmalloc;
-use verona_rt::{with_leak_detector, Cown};
+use boxcars::log_snmalloc;
+use boxcars::{with_leak_detector, Cown};
 
 // RUSTFLAGS='--cfg slow_tests' cargo test --all
 #[cfg(slow_tests)]

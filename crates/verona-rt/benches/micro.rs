@@ -2,8 +2,8 @@ use std::{hint::black_box, time::Instant};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
+use boxcars::{when, with_n_threads, with_scheduler, Cown};
 use philosophers::do_phil;
-use verona_rt::{when, with_n_threads, with_scheduler, Cown};
 
 #[path = "micro/banking.rs"]
 mod banking;

@@ -1,4 +1,4 @@
-use verona_rt::Cown;
+use boxcars::Cown;
 
 #[test]
 fn main() {
@@ -6,7 +6,7 @@ fn main() {
         verona_rt_sys::enable_logging();
     }
 
-    verona_rt::with_scheduler(|| {
+    boxcars::with_scheduler(|| {
         let v1 = Cown::new(101);
         drop(v1);
     });

@@ -1,4 +1,4 @@
-use verona_rt::{when, with_n_threads, Cown};
+use boxcars::{when, with_n_threads, Cown};
 
 struct Table {
     done_eating: usize,

@@ -1,4 +1,4 @@
-use verona_rt::with_scheduler;
+use boxcars::with_scheduler;
 
 #[test]
 #[ignore = "https://github.com/aDotInTheVoid/boxcars/issues/4"]

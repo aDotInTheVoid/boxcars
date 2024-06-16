@@ -1,4 +1,4 @@
-use verona_rt::{log, with_leak_detector, Cown};
+use boxcars::{log, with_leak_detector, Cown};
 
 // cargo run --example log-around-new --features systematic_testing,snmalloc_tracing
 // RUSTFLAGS=-Zsanitizer=address cargo +nightly run --example log-around-new --features asan

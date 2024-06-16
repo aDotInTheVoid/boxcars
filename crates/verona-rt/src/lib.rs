@@ -6,7 +6,7 @@
 //! as introduced in that paper.
 //!
 //! ```rust
-//! # use verona_rt::*;
+//! # use boxcars::*;
 //! # with_scheduler(|| {
 //! let string = Cown::new(String::new());
 //! let vec = Cown::new(Vec::<i32>::new());

@@ -1,4 +1,4 @@
-use verona_rt::Cown;
+use boxcars::Cown;
 
 struct Foo;
 
@@ -9,7 +9,7 @@ impl Drop for Foo {
 }
 
 fn main() {
-    verona_rt::with_scheduler(|| {
+    boxcars::with_scheduler(|| {
         dbg!();
         let foo = Cown::new(Foo);
         let f2 = foo.clone();

@@ -1,4 +1,4 @@
-use verona_rt::{when, with_scheduler, AcquiredCown, Cown};
+use boxcars::{when, with_scheduler, AcquiredCown, Cown};
 
 use std::ops::DerefMut;
 

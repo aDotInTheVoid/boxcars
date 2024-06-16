@@ -19,7 +19,7 @@ unsafe {
 This is global racy state, so should probably only be used temporarily.
 
 ```rust
-verona_rt::log::log("Yoohoo, we're here");
+boxcars::log::log("Yoohoo, we're here");
 ```
 
 This may also be racy, so be careful.

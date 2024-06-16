@@ -92,14 +92,18 @@ fn time_philosophers(c: &mut Criterion) {
     let mut group = c.benchmark_group("Philosophers");
 
     for nthread in 1..10 {
-        group.bench_with_input(BenchmarkId::new("Rust", nthread), &nthread, |b, nthread| {
-            b.iter(|| {
-                do_phil(20, 10000, false, *nthread);
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("boxcars", nthread),
+            &nthread,
+            |b, nthread| {
+                b.iter(|| {
+                    do_phil(20, 10000, false, *nthread);
+                });
+            },
+        );
 
         // group.bench_with_input(
-        //     BenchmarkId::new("Rust Optimal", nthread),
+        //     BenchmarkId::new("boxcars Optimal", nthread),
         //     &nthread,
         //     |b, nthread| {
         //         b.iter(|| {
@@ -108,19 +112,25 @@ fn time_philosophers(c: &mut Criterion) {
         //     },
         // );
 
-        group.bench_with_input(BenchmarkId::new("C++", nthread), &nthread, |b, nthread| {
-            b.iter(|| unsafe {
-                bbench_do_philosopher(20, 10000, *nthread);
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("verona-rt", nthread),
+            &nthread,
+            |b, nthread| {
+                b.iter(|| unsafe {
+                    bbench_do_philosopher(20, 10000, *nthread);
+                });
+            },
+        );
     }
 }
 
 fn time_with_sched(c: &mut Criterion) {
     let mut group = c.benchmark_group("Scheduler");
 
-    group.bench_function("Rust", |b| b.iter(|| with_n_threads(1, || { /* no-op */ })));
-    group.bench_function("C++", |b| {
+    group.bench_function("boxcars", |b| {
+        b.iter(|| with_n_threads(1, || { /* no-op */ }))
+    });
+    group.bench_function("verona-rt", |b| {
         b.iter(|| unsafe {
             bbench_create_scheduler();
         })
@@ -130,12 +140,12 @@ fn time_with_sched(c: &mut Criterion) {
 fn time_barber(c: &mut Criterion) {
     let mut group = c.benchmark_group("savina/Barber");
 
-    group.bench_function("Rust", |b| {
+    group.bench_function("boxcars", |b| {
         b.iter(|| {
             barber::bench_barber(5000, 1000, 1000, 1000);
         });
     });
-    group.bench_function("C++", |b| {
+    group.bench_function("verona-rt", |b| {
         b.iter(|| unsafe {
             bbench_do_barber(5000, 1000, 1000, 1000);
         })
@@ -145,13 +155,13 @@ fn time_barber(c: &mut Criterion) {
 fn time_banking(c: &mut Criterion) {
     let mut group = c.benchmark_group("savina/Banking");
 
-    group.bench_function("Rust", |b| {
+    group.bench_function("boxcars", |b| {
         b.iter(|| {
             do_banking(1000, 50000);
         });
     });
 
-    group.bench_function("C++", |b| {
+    group.bench_function("verona-rt", |b| {
         b.iter(|| unsafe {
             bbench_do_banking(1000, 50000);
         });
@@ -162,7 +172,7 @@ fn time_busy_loop(c: &mut Criterion) {
     let mut group = c.benchmark_group("Busy Loop");
 
     for nsecs in 0..5 {
-        group.bench_with_input(BenchmarkId::new("Rust", nsecs), &nsecs, |b, nsecs| {
+        group.bench_with_input(BenchmarkId::new("boxcars", nsecs), &nsecs, |b, nsecs| {
             b.iter_custom(|iters| {
                 let start = Instant::now();
                 busyloop_inside_when(*nsecs, iters);
@@ -170,7 +180,7 @@ fn time_busy_loop(c: &mut Criterion) {
             })
         });
 
-        group.bench_with_input(BenchmarkId::new("C++", nsecs), &nsecs, |b, nsecs| {
+        group.bench_with_input(BenchmarkId::new("verona-rt", nsecs), &nsecs, |b, nsecs| {
             b.iter_custom(|iters| {
                 let start = Instant::now();
                 unsafe {
@@ -186,10 +196,10 @@ fn time_n_cowns(c: &mut Criterion) {
     let mut group = c.benchmark_group("Create Cowns");
 
     for i in (10..16).map(|i| 2usize.pow(i)) {
-        group.bench_with_input(BenchmarkId::new("rust", i), &i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("boxcars", i), &i, |b, i| {
             b.iter(|| black_box(create_n_cowns(black_box(*i))))
         });
-        group.bench_with_input(BenchmarkId::new("c++", i), &i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("verona-rt", i), &i, |b, i| {
             b.iter(|| unsafe { bbench_create_n_cowns(*i) })
         });
     }
@@ -199,14 +209,14 @@ fn time_n_behaviours(c: &mut Criterion) {
     let mut group = c.benchmark_group("Schedule Behaviours");
 
     for i in (10..16).map(|i| 2usize.pow(i)) {
-        group.bench_with_input(BenchmarkId::new("rust", i), &i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("boxcars", i), &i, |b, i| {
             b.iter_custom(|iters| {
                 let start = Instant::now();
                 schedule_n_lambdas_onto_cown(*i, iters);
                 start.elapsed()
             });
         });
-        group.bench_with_input(BenchmarkId::new("c++", i), &i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("verona-rt", i), &i, |b, i| {
             b.iter_custom(|iters| {
                 let start = Instant::now();
                 unsafe { bbench_schedule_n_lambdas_onto_cown(*i, iters) };
@@ -272,7 +282,7 @@ fn time_fib(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci");
 
     for i in 14..22 {
-        group.bench_with_input(BenchmarkId::new("Rust", i), &i, |b, n| {
+        group.bench_with_input(BenchmarkId::new("boxcars", i), &i, |b, n| {
             b.iter_custom(|iters| {
                 let exp = sequential_fib(*n);
 
@@ -282,7 +292,7 @@ fn time_fib(c: &mut Criterion) {
             });
         });
 
-        group.bench_with_input(BenchmarkId::new("Rust Uncareful", i), &i, |b, n| {
+        group.bench_with_input(BenchmarkId::new("boxcars uncareful", i), &i, |b, n| {
             b.iter_custom(|iters| {
                 let exp = sequential_fib(*n);
 
@@ -292,7 +302,7 @@ fn time_fib(c: &mut Criterion) {
             });
         });
 
-        group.bench_with_input(BenchmarkId::new("C++", i), &i, |b, n| {
+        group.bench_with_input(BenchmarkId::new("verona-rt", i), &i, |b, n| {
             b.iter_custom(|iters| {
                 let exp = sequential_fib(*n);
                 let start = Instant::now();
@@ -303,7 +313,7 @@ fn time_fib(c: &mut Criterion) {
             });
         });
 
-        group.bench_with_input(BenchmarkId::new("C++ Careful", i), &i, |b, n| {
+        group.bench_with_input(BenchmarkId::new("verona-rt careful", i), &i, |b, n| {
             b.iter_custom(|iters| {
                 let exp = sequential_fib(*n);
                 let start = Instant::now();

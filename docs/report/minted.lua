@@ -419,13 +419,13 @@ function CodeBlock(block)
 
     -- Alona(2024-06-15): Use a listing here.
     local r = "\\begin{listing}["
-    if block.classes.freefloat then
-      r = r.."h"
+    if block.classes:includes("freefloat", 0) then
+      r = r.."h]\n"
     else
       -- TODO: Use [h] instead?
-      r = r.."H"
+      r = r.."H]%NOT FREEFLOATING\n"
     end
-    r = r.."]\n"
+    
 
     local s_caption = block.attributes.caption
     local s_label = block.attributes.label 

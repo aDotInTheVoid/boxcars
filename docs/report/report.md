@@ -953,7 +953,7 @@ While most of the time `AcquiredCown<'a, T>` acts like a transparent wrapper
 over `&'a mut T`, there are some cases where this abstraction becomes leaky, and
 users need to be aware that they're not dealing with a normal reference.
 
-```rust {label="autoderef-example" caption="Demonstration of auto-deref"}
+```rust {.freefloat label="autoderef-example" caption="Demonstration of auto-deref"}
     let cown = Cown::<i32>::new(10);
 
     // This type annotation isn't needed, but makes the coercion clearer
@@ -969,7 +969,7 @@ method calls, as shown in listing \ref{autoderef-methods}, where we can call
 [`to_uppercase`](https://doc.rust-lang.org/1.79.0/std/primitive.str.html#method.to_uppercase)
 (a method defined on `&str`) on an `AcquiredCown<&str>`.
 
-```rust {label="autoderef-methods" caption="Calling methods on acquired cowns via auto-deref"}
+```rust {.freefloat label="autoderef-methods" caption="Calling methods on acquired cowns via auto-deref"}
     let cown = Cown::<&str>::new("hello");
 
     when(&cown, |acq_cown: AcquiredCown<&str>| {
@@ -985,7 +985,7 @@ allow an `AcquiredCown<T>` to be treated like an `&mut T`. This normally works
 seamlessly, as shown in listings \ref{autoderef-example} and
 \ref{autoderef-methods}.
 
-```rust {label="partial-works" caption="Demonstration of partial borrowing"}
+```rust {.freefloat label="partial-works" caption="Demonstration of partial borrowing"}
 struct Foo {
     a: i32,
     b: i32,
@@ -1006,7 +1006,7 @@ translation of this code to BoC (listing \ref{needs-partial}) fails to compile, 
 \ref{multiborrow-error}.
 
 
-```rust {label="needs-partial" caption="Attempting to borrow two fields of a struct in a cown"}
+```rust {.freefloat label="needs-partial" caption="Attempting to borrow two fields of a struct in a cown"}
 let cown = Cown::new(Foo { a: 1, b: 1 });
 when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
   use_ints(&mut acq_cown.a, &mut acq_cown.b)
@@ -1031,7 +1031,7 @@ to convert from `&mut AcquiredCown<Foo>` (which doesn't have fields `a` or `b`)
 to `&mut Foo` (which does). This happens both times `acq_cown` is dereferenced,
 with the compiler desugaring it into the code given in listing \ref{autoderef-desugared}.
 
-```rust {label="autoderef-desugared" caption="The desugaring of the call to \texttt{use\\_ints} in listing \ref{needs-partial}"}
+```rust {.freefloat label="autoderef-desugared" caption="The desugaring of the call to \texttt{use\\_ints} in listing \ref{needs-partial}"}
 use_ints(
     &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).a,
     &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).b,
@@ -1051,7 +1051,7 @@ can we borrow the individual field that we want. At the time of the
 `deref_mut` call, we have borrowed _all_ of `acq_cown`. Whereas in listing
 \ref{partial-works}, we never borrow all of `foo`, only its individual fields.
 
-```{caption="\captionerr{autoderef-desugared}" label="autoderef-desugared-err"}
+```text {.freefloat caption="\captionerr{autoderef-desugared}" label="autoderef-desugared-err"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
   --> tests/ui/partial-borrow.rs:30:65
    |
@@ -1067,7 +1067,7 @@ It is possible to work around this. As shown in
 \ref{partial-borrows-workaround}, one can instead first borrow the _entire_
 cown, and then borrow the fields on that.
 
-```rust {label="partial-borrows-workaround" caption="Version of \ref{needs-partial} that compiles"}
+```rust {.freefloat label="partial-borrows-workaround" caption="Version of \ref{needs-partial} that compiles"}
 when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
     let mut_ref: &mut Foo = &mut *acq_cown;
     use_ints(&mut mut_ref.a, &mut mut_ref.b)
@@ -1087,7 +1087,7 @@ the information that the argument was a cown anywhere in the system, so it would
 be possible to schedule another behaviour onto it.
 
 
-```rust {label="why-acquiredcown" caption="Scheduling a new behaviour onto a cown acquired by another behaviour"}
+```rust {.freefloat label="why-acquiredcown" caption="Scheduling a new behaviour onto a cown acquired by another behaviour"}
 when((a, b), |(a, b)| {
   do_something_with(a, b);
   when(&a.cown(), |a| do_something_else_with(a));

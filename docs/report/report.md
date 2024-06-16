@@ -254,7 +254,7 @@ out of scope (and therefore dropped). This is caught by the compiller, as shown
 be the error in listing \ref{rust-uaf-err}, whereas in C++ it would be undefined
 behaviour.
 
-```rust {.freefloating label="rust-uaf" caption="Attempting to use a reference to a value that's out of scope"}
+```rust {.freefloat label="rust-uaf" caption="Attempting to use a reference to a value that's out of scope"}
 let mut x: &i32 = 0;
 {
     let short_lived: i32 = 0;
@@ -263,7 +263,7 @@ let mut x: &i32 = 0;
 dbg!(x);
 ```
 
-```text {.freefloating label="rust-uaf-err" caption="\captionerr{rust-uaf}"}
+```text {.freefloat label="rust-uaf-err" caption="\captionerr{rust-uaf}"}
 error[E0597]: `short_lived` does not live long enough
  --> src/main.rs:5:13
   |
@@ -278,10 +278,9 @@ error[E0597]: `short_lived` does not live long enough
 ```
 
 <!-- TODO: ./todo/more-on-borrowing.md -->
-
 <!-- TODO: Explain type-safe mutex's here. -->
-
 <!-- TODO: Explain that rust in race-free here. -->
+<!-- TODO: Idea of unsafe and builting safe abstractions from unsafe parts. -->
 
 ### Deadlocks
 
@@ -340,20 +339,24 @@ Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm
 
 - **Behaviours**: A behaviour is a unit of execution that acts upon a set of cowns.
 
-    When you create a behaviour, you give the set of cowns it acts on, as well as
-    the code to run. When all the required cowns can be acquired, the code is executed, and then
-    the cowns are made available again.
+    When a behaviour is spawned, it is given the set of cowns it will acts on,
+    as well as the code to run on them. When all the required cowns can be
+    acquired, the code is executed, and then the cowns are made available again.
 
-    Cowns can only be acquired by one behaviour at once. This can be thaugh of as being a bit
-    like each Cown having a mutex, which is locked before the behaviour starts and unlocked after
-    it ends. However, every cown in a behaviour is acquired "at once"
+    A Cown can only be acquired by one behaviour at any given. This can be
+    thaugh of as being like each cown having a mutex, which is locked before the
+    behaviour starts and unlocked after it ends. However, every cown in a
+    behaviour is acquired atomicly, and there is no change for deadlock.
 
-    Note that this means that creating a behaviour returns immediately, and the code inside
-    will be executed at some indetermined future point, when unique access to all cowns can
-    be guaranteed.
+    Note that this means that spawning a behaviour returns immediately, and the
+    code inside will be executed at some indetermined future point, when unique
+    access to all cowns can be guaranteed.
 
 
-```scala
+Listing \ref{boc-basics} contains a simple example of BoC code in some
+hypothetical language. The
+
+```scala {.linenos .freefloat label="boc-basics" caption="Demonstration of BoC"}
 var myCown: Cown[int] = cown.create(10);
 
 when(myCown) {
@@ -366,37 +369,139 @@ myCown += 10; // invalid.
 BoC is both *data-race free* and *deadlock free*. No data races can occur, as
 cowns can only be modified when acquired by behaviours,
 
+<!-- TODO: This needs work. -->
+
 ## Verona Runtime
 
 The verona runtime (sometimes also known as `verona-rt`) is a C++ library that
 implements behaviour oriented concurrency. It is intended to be a part of the
 currently in development Verona language, but it can also be used as a
-freestanding C++ library today.
+freestanding C++ library today [@when_concurrency_matters].
 
-It uses the C++ type system to enforse the destinction between availible and 
-aquired cowns. The `cown_ptr<T>` type references a cown containing `T`, but doens't
-allow accessing the data. Instead, when a behaviour executed, it's given an `acquired_cown<T>`, 
-which can access the underlying data.
+It exposes both a the `verona::cpp` API, which uses templates to expose a typed
+C++ api for cowns and behaviours, as well as the lower level `verona::rt` API,
+which is used to implement `verona::cpp`, but can also be used in it's own
+right. 
 
-Internally, these have the same representation, but. An `acquired_cown<T>` is
-only handed out when the behavior runs. In this way, the compiler can enforce that
-cowns can only have their data accessed when acquired. Eg:
+<!-- TODO: Discuss verona::rt
+- Cown*
+- Descriptors
+- BehaviourCore
+ -->
 
-```cpp
+### `verona::cpp` API
+
+The `verona::cpp` API let's users write BoC programs in a nice DSL. For cowns,
+it exposes the `cown_ptr<T>` type, which holds the underlying `T` behind a
+reference-count, but doesn't allow access to it directly. This enforces the
+invariant in BoC that cowns can only be accessed when they're acquired.
+
+To acquire a cown, you can use the `when` function. This takes in the cowns you
+want to acquire, and a lambda to invoke on those cowns. This lambda is passed a
+parameter of type `acquired_cown<T>`. This represents the same cown that was
+passed in the agument, but with the idea that it's acquired (and therefor
+allowed to mutate the cown's underlying data) encoded in the type system.
+Listing \ref{rt-cpp-1} shows an example of this [^cppinfer].
+
+[^cppinfer]: I'm choosing to give the type declaration of all variables for
+    clairity. On actuall code, most of these can be infered, and will be written
+    as `auto` instead.
+
+```cpp {.freefloat label="rt-cpp-1" caption="Creating and acquiring a cown with the \texttt{verona::cpp} library"}
 cown_ptr<int> my_cown = make_cown<int>(10);
 when(my_cown) << [](acquired_cown<int> my_cown) {
-    my_cown += 10; // this works fine, via operator overloading.
+    // cown acquired in here.
 };
-my_cown += 10; // compiler error!
 ```
 
-The `when` function takes a `cown_ptr`, and a lambda that takes an `acquired_cown`.
-When the cown can be acquired, it creates an `acquired_cown` (which cannot be done outside the verona-rt library),
-and passes that to the lambda. 
+Unlike `cown_ptr<T>`, `acquired_cown<T>` does allow access to and mutation of
+the underling data. By overloading `operator->`, `operator*` and `operator T&`, it is able
+to provide transparent access to the underlying data, as shown in listing \ref{rt-cpp-2}.
 
-However, a determined user can circumvent this type safety. As one example:
+```cpp {.freefloat label="rt-cpp-2" caption="Mutating and accessing a cown that has been acquired"}
+auto f = make_cown<std::string>("hello");
 
-```cpp
+when(f) << [](auto f) {
+  f->push_back('!');
+  std::cout << *f << '\n';
+};
+```
+
+But when a cown isn't acquired, as in listing \ref{cpp-bad-access}, it's a
+compiller error to attemt to access the contained data (listing \ref{cpp-bad-access-err}).
+
+```cpp {.freefloat label="cpp-bad-access" caption="Attemting to access a non-acquired cown"}
+auto f = make_cown<std::string>("hello");
+
+when(f) << [](auto f) {
+  f->push_back('!'); // This is ok, cown acquired
+};
+
+f->push_back('?'); // Compiller error, cown not acquired
+```
+
+```text {.freefloat .breaklines label="cpp-bad-access-err" caption="\captionerr{cpp-bad-access}"}
+playground.cc: In function ‘void real_main()’:
+playground.cc:35:4: error: base operand of ‘->’ has non-pointer type ‘verona::cpp::cown_ptr<std::__cxx11::basic_string<char> >’
+   35 |   f->push_back('?');
+      |    ^~
+```
+
+#### How `cown_ptr` and `acquired_cown` model BoC {#verona_cpp_ptr}
+
+In order to have `cown_ptr` and `acquired_cown` correctly model the semantics of
+a cown in BoC, they must do a few things.
+
+1. A `cown_ptr` must always point to a non-dangling cown.
+2. An `acquired_cown` must only be accessable when that cown has been acquired.
+
+The first of these is achieved by having `cown_ptr` overload its
+constructors, assignment operators, and destructor to maintain the cowns internal
+reference-count. Much like `std::shared_ptr`, this means that when user does
+`cown_ptr<int> b = a`, the reference count of the cown is incremented.
+
+To achieve the second, a `acquired_cown` is made to only be constructable by
+certain classes inside the `verona::cpp` namespace. These will only do so in
+order to pass to the lambda given to `when`, and in no other circumstance.
+Therefor, the only way to obtain an `acquired_cown` is when it has been acquired
+by a behaviour created with `when`.
+
+In addition `acquired_cown` detete's it's move and copy constructors, and it's
+assignment operators, so that users cannot store it anywhere other than the
+parameter of the lambda. This means that attemts such as listing \ref{cpp-squirrl}
+are caught by the compiller. 
+
+```cpp {.freefloat label="cpp-squirrl" caption="Attempting to store a \texttt{acquired\\_cown} for use later"}
+cown_ptr<int> cown = make_cown<int>(10);
+when(cown) << [](acquired_cown<int> f) { squirrel_away_for_later(f); };
+```
+
+```text {.freefloat .breaklines label="cpp-squirrl-error" caption="\captionerr{cpp-squirrl-error}"}
+playground.cc: In lambda function:
+playground.cc:35:67: error: use of deleted function ‘verona::cpp::acquired_cown<T>::acquired_cown(const verona::cpp::acquired_cown<T>&) [with T = int]’
+   35 |   when(cown) << [](acquired_cown<int> f) { squirrel_away_for_later(f); };
+      |                                            ~~~~~~~~~~~~~~~~~~~~~~~^~~
+In file included from verona-rt/src/rt/./cpp/when.h:6,
+                 from playground.cc:1:
+verona-rt/src/rt/./cpp/cown.h:464:5: note: declared here
+  464 |     acquired_cown(const acquired_cown&) = delete;
+      |     ^~~~~~~~~~~~~
+playground.cc:27:49: note:   initializing argument 1 of ‘void squirrel_away_for_later(verona::cpp::acquired_cown<int>)’
+   27 | void squirrel_away_for_later(acquired_cown<int> acq);
+      |                              ~~~~~~~~~~~~~~~~~~~^~~
+```
+
+#### Circumventing access gaurentees via pointer.
+
+While the behaviour discussed above (§\ref{verona_cpp_ptr}) ensures than an
+`acquired_cown` can only be accessed when that cown is acquired, this doesn't
+ensure that the *cowns data* can only be accedded when that cown is acquired. As
+shown in listing \ref{cpp-bypass-safety}, a user can get a pointer to the
+underlying data from an `acquired_cown`, and nothing prevents that pointer being
+used to access the cown even after it's no longer acquired by the behaviour in
+which it was obtained.
+
+```cpp {.freefloat label="cpp-byppass-safety" caption="Accessing a cowns data when that cown isn't acqured"}
 cown_ptr<int> my_cown = make_cown<int>(10);
 int* escape_data;
 when(my_cown) << [&escape_data](acquired_cown<int> my_cown) {
@@ -406,13 +511,17 @@ sleep(3); // Wait for behaviour to run
 *escape_data += 10; // Modifies cown without acquiring!!!
 ```
 
-This exposes the underlying data via `escape_data`. A user could then
-modify the cowns data without acquiring it, undermining BoC's goal
-of no-data-races. This is because C++ has no mechanism to limit
-how long a pointer can be used, and the `acquired_cown` class
-must give out pointers to allow access to the underlying data.
+Because users can access a cowns data when it it no longer acqured, the
+`verona::cpp` implementation of BoC fails to provide the datarace freedom, even
+though the underlying BoC model it does. This is because C++ isn't expressive
+enough to encode the idea the an acquired cown (the BoC concept, not the C++
+implementation of said concept) can only be accessed for a limited duration.
+This is because C++ has no mechanism to limit how long a pointer/reference can
+be used, and the `acquired_cown` class must give out pointers/references to
+allow access to the underlying data.
 
 Rust can solve this with the power of lifetimes.
+<!-- TODO: Is this line a good idea? -->
 
 <!--
 ### Other concurrency paradimes

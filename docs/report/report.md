@@ -8,7 +8,7 @@ link-citations: true
 papersize: a4
 geometry: a4paper,includeheadfoot,driver=xetex,twoside,hmargin=2.25cm,vmargin=1cm
 # geometry: a4paper,hmargin=2.8cm,vmargin=1.0cm,includeheadfoot
-toc: false # We insert the TOC ourselves, after the abstact and acknoledgements.
+toc: false # We insert the TOC ourselves, after the abstract and acknoledgements.
 toc-depth: 2
 colorlinks: true
 numbersections: true
@@ -32,9 +32,9 @@ parallel programming. While Rust is shown be memory safe and datarace free,
 it is not deadlock free.
 
 **Behaviour-Oriented Concurrency** is a novel paradigm that extends the actor
-model to allow atomicly sending messages to multiple actors. Behaviour-Oriented
+model to allow atomically sending messages to multiple actors. Behaviour-Oriented
 Concurrency is both datarace-free and deadlock-free. **`verona-rt`** is a C++
-library that provides an effient implementation of a runtime for
+library that provides an efficient implementation of a runtime for
 behaviour-oriented concurrency.
 
 This project introduces the **`boxcars`** library, which allows using
@@ -55,8 +55,8 @@ Furthermore, we demonstrate that it imposes minimal overhead over using
 \begin{abstract}
 ```
 
-First and foremost, I must thanks Marios Kogias for his excelent job as project
-supervisor. His advice and guidance thoughout the project have been stellar.
+First and foremost, I must thanks Marios Kogias for his excellent job as project
+supervisor. His advice and guidance throughout the project have been stellar.
 
 I'd also like to thank Matthew Parkinson, David Chisnall, and Sylvan Clebsch for
 providing critical feedback when presented with a much earlier version of the
@@ -110,7 +110,7 @@ It has type safety, memory safety and freedom from data-races.
 
 Rust's most important feature (for our purposes) is its system of **Ownership & Borrowing**.
 
-### Ownership & Borrowing
+### Ownership & Borrowing {#rust-ownership}
 
 While a full tutorial on ownership and borrowing (and Rust more broadly) is well
 beyond the scope of this report, it is important to understand the principles at
@@ -123,24 +123,24 @@ goes out of scope. To quote The Book [@rust_book]:
 > - When the owner goes out of scope, the value will be dropped.
 
 Using just these rules, Rust could offer a type-safe and memory-safe programming
-language. However, it would be extreamly cumbersome to program in. For example,
-if a function took a paramater, that function would become the owner of that
+language. However, it would be extremely cumbersome to program in. For example,
+if a function took a parameter, that function would become the owner of that
 parameter, and the value would no longer be able to be used.
 
 
 ```rust {.freefloat caption="A demonstration of ownership" label="own1"}
 let x: String = make_string();  // `x` owns a `String`
-do_thing_with_string(x);        // ownership of `x` transfered
+do_thing_with_string(x);        // ownership of `x` transferred
 do_other_thing_with_string(x);  // `x` cannot be used here
 ```
 
 For example, in listing \ref{own1}, the variable `x` is the owner of a value of
 type `String`. However, when calling `do_thing_with_string`, ownership is
-moved (or _transfered_) to that function. This means that the value cannot be used in the
-call to `do_other_thing_with_string`. Indeed, this is what the compiller error
+moved (or _transferred_) to that function. This means that the value cannot be used in the
+call to `do_other_thing_with_string`. Indeed, this is what the compiler error
 in listing \ref{own1-err} shows us.
 
-```text {.freefloat .breaklines caption="Compiller error for listing \ref{own1}" label="own1-err"}
+```text {.freefloat .breaklines caption="\captionerr{own1}" label="own1-err"}
 error[E0382]: use of moved value: `x`
   --> src/main.rs:4:32
    |
@@ -154,12 +154,12 @@ error[E0382]: use of moved value: `x`
 ```
 
 This is in different to C++, where objects can be used after they are `std::move`d
-from. However, the standard places no gaurentees on the content of those
+from. However, the standard places no guarantees on the content of those
 objects, only saying "moved-from objects shall be placed in a valid but
 unspecified state" [@cppstd].
 
 To avoid this constantly becoming a footgun for users, C++ values won't be moved
-by default, but instead will be copied, which leaves the origional value intact.
+by default, but instead will be copied, which leaves the original value intact.
 This is shown by \ref{cpp-copy}, where `x` is used both
  values are copied by default.
 
@@ -188,16 +188,27 @@ In order to support this, C++ has a concept of copy and move constructors
 to set the moved-from allocation to `NULL`) or copied (eg to create a new
 allocation). In contrast, Rust moves are always bitwize (ie the result of
 `memcpy`ing the value from the old to new location). However, as the old value
-is gaurenteed to never be accessed, libraries don't need to modify it on the way
+is guaranteed to never be accessed, libraries don't need to modify it on the way
 out, to avoid use-after-free.
+
+[^assign_op]: This means to fully support managing ownership of a value, a C++
+    type should overload:
+
+    1. Its destructor
+    2. Its copy constructor
+    3. Its copy assignment operator
+    4. Its move constructor
+    5. Its move assignment operator
+
+    This is knows at the "Rule of 5" [@cpp_core_guidelines].
 
 #### Borrowing
 
 If values could only be owned and moved, than programming in Rust would be
-extreamly unergonomic. As shown, all values could only be used by a function
-once, and then would no longer be accessable [^return_values].
+extremely unergonomic. As shown, all values could only be used by a function
+once, and then would no longer be accessible [^return_values].
 
-[^return_values]: This could be  somehwat circumvented by having a function
+[^return_values]: This could be  somewhat circumvented by having a function
 return back it's arguments to the caller, but this would be extremely
 cumbersome.
 
@@ -218,7 +229,7 @@ shared references (for `&T`) and exclusive references (for `&mut T`)
 
 Borrowed values have a **lifetime** for which they are borrowed. This is needed
 to ensure that all exclusive references don't overlap with shared ones. This is
-enforces by a part of the compiller called the "borrow checker", that assigns a
+enforces by a part of the compiler called the "borrow checker", that assigns a
 lifetime to each borrow, and uses this to determine if there are ever any
 aliased mutable borrows. Listing \ref{lifetime_demo} contains an example of the
 lifetimes assigned to various borrows.
@@ -249,8 +260,8 @@ dbg!(shared_3);
 
 Because the borrow checker knows what values each borrow is borrowing from, it
 is able to ensure that borrows are not instead of doing UB like it would in C++.
-Listing \ref{rust-uaf} attemts to use a borrow to `short_lived` after it's gone
-out of scope (and therefore dropped). This is caught by the compiller, as shown
+Listing \ref{rust-uaf} attempts to use a borrow to `short_lived` after it's gone
+out of scope (and therefore dropped). This is caught by the compiler, as shown
 be the error in listing \ref{rust-uaf-err}, whereas in C++ it would be undefined
 behaviour.
 
@@ -301,7 +312,7 @@ fn main() {
     scope(|s| {
         s.spawn(|| {
             let g1 = m1.lock();
-            sleep_ms(100); // not strictly nessesary, but makes it more likely.
+            sleep_ms(100); // not strictly necessary, but makes it more likely.
             println!("t1: got m1, trying to get m2");
             let g2 = m2.lock();
             println!("t1: got both");
@@ -333,7 +344,7 @@ Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm
     A cown can be in one of two states: available or acquired. An available
     cown is eligible to be acquired by a behaviour, but it's associated data
     cannot be accessed. An acquired cown can have it's data accessed, but only
-    while it's aquired.
+    while it's acquired.
 
     The only way to acquire a cown (and thus access it's) is to run a behaviour on it.
 
@@ -346,7 +357,7 @@ Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm
     A Cown can only be acquired by one behaviour at any given. This can be
     thaugh of as being like each cown having a mutex, which is locked before the
     behaviour starts and unlocked after it ends. However, every cown in a
-    behaviour is acquired atomicly, and there is no change for deadlock.
+    behaviour is acquired atomically, and there is no change for deadlock.
 
     Note that this means that spawning a behaviour returns immediately, and the
     code inside will be executed at some indetermined future point, when unique
@@ -354,9 +365,9 @@ Behaviour-Oriented Concurrency (BoC) is a novel concurrency paradigm
 
 
 Listing \ref{boc-basics} contains a simple example of BoC code in some
-hypothetical language. The
+hypothetical language.
 
-```scala {.linenos .freefloat label="boc-basics" caption="Demonstration of BoC"}
+```scala { .freefloat label="boc-basics" caption="Demonstration of BoC"}
 var myCown: Cown[int] = cown.create(10);
 
 when(myCown) {
@@ -365,6 +376,8 @@ when(myCown) {
 
 myCown += 10; // invalid.
 ```
+
+<!-- TODO: What's my point here. -->
 
 BoC is both *data-race free* and *deadlock free*. No data races can occur, as
 cowns can only be modified when acquired by behaviours,
@@ -389,6 +402,12 @@ right.
 - BehaviourCore
  -->
 
+### `veronna::rt` API
+
+#### `Cown`
+
+#### `Descriptor`
+
 ### `verona::cpp` API
 
 The `verona::cpp` API let's users write BoC programs in a nice DSL. For cowns,
@@ -399,12 +418,12 @@ invariant in BoC that cowns can only be accessed when they're acquired.
 To acquire a cown, you can use the `when` function. This takes in the cowns you
 want to acquire, and a lambda to invoke on those cowns. This lambda is passed a
 parameter of type `acquired_cown<T>`. This represents the same cown that was
-passed in the agument, but with the idea that it's acquired (and therefor
+passed in the argument, but with the idea that it's acquired (and therefor
 allowed to mutate the cown's underlying data) encoded in the type system.
 Listing \ref{rt-cpp-1} shows an example of this [^cppinfer].
 
 [^cppinfer]: I'm choosing to give the type declaration of all variables for
-    clairity. On actuall code, most of these can be infered, and will be written
+    clairity. On actual code, most of these can be inferred, and will be written
     as `auto` instead.
 
 ```cpp {.freefloat label="rt-cpp-1" caption="Creating and acquiring a cown with the \texttt{verona::cpp} library"}
@@ -428,16 +447,16 @@ when(f) << [](auto f) {
 ```
 
 But when a cown isn't acquired, as in listing \ref{cpp-bad-access}, it's a
-compiller error to attemt to access the contained data (listing \ref{cpp-bad-access-err}).
+compiler error to attempt to access the contained data (listing \ref{cpp-bad-access-err}).
 
-```cpp {.freefloat label="cpp-bad-access" caption="Attemting to access a non-acquired cown"}
+```cpp {.freefloat label="cpp-bad-access" caption="Attempting to access a non-acquired cown"}
 auto f = make_cown<std::string>("hello");
 
 when(f) << [](auto f) {
   f->push_back('!'); // This is ok, cown acquired
 };
 
-f->push_back('?'); // Compiller error, cown not acquired
+f->push_back('?'); // Compiler error, cown not acquired
 ```
 
 ```text {.freefloat .breaklines label="cpp-bad-access-err" caption="\captionerr{cpp-bad-access}"}
@@ -453,7 +472,7 @@ In order to have `cown_ptr` and `acquired_cown` correctly model the semantics of
 a cown in BoC, they must do a few things.
 
 1. A `cown_ptr` must always point to a non-dangling cown.
-2. An `acquired_cown` must only be accessable when that cown has been acquired.
+2. An `acquired_cown` must only be accessible when that cown has been acquired.
 
 The first of these is achieved by having `cown_ptr` overload its
 constructors, assignment operators, and destructor to maintain the cowns internal
@@ -468,15 +487,15 @@ by a behaviour created with `when`.
 
 In addition `acquired_cown` detete's it's move and copy constructors, and it's
 assignment operators, so that users cannot store it anywhere other than the
-parameter of the lambda. This means that attemts such as listing \ref{cpp-squirrl}
-are caught by the compiller. 
+parameter of the lambda. This means that attempts such as listing \ref{cpp-squirrel}
+are caught by the compiler. 
 
-```cpp {.freefloat label="cpp-squirrl" caption="Attempting to store a \texttt{acquired\\_cown} for use later"}
+```cpp {.freefloat label="cpp-squirrel" caption="Attempting to store a \texttt{acquired\\_cown} for use later"}
 cown_ptr<int> cown = make_cown<int>(10);
 when(cown) << [](acquired_cown<int> f) { squirrel_away_for_later(f); };
 ```
 
-```text {.freefloat .breaklines label="cpp-squirrl-error" caption="\captionerr{cpp-squirrl-error}"}
+```text {.freefloat .breaklines label="cpp-squirrel-error" caption="\captionerr{cpp-squirrel-error}"}
 playground.cc: In lambda function:
 playground.cc:35:67: error: use of deleted function ‘verona::cpp::acquired_cown<T>::acquired_cown(const verona::cpp::acquired_cown<T>&) [with T = int]’
    35 |   when(cown) << [](acquired_cown<int> f) { squirrel_away_for_later(f); };
@@ -491,7 +510,7 @@ playground.cc:27:49: note:   initializing argument 1 of ‘void squirrel_away_fo
       |                              ~~~~~~~~~~~~~~~~~~~^~~
 ```
 
-#### Circumventing access gaurentees via pointer.
+#### Circumventing access guarantees via pointer.
 
 While the behaviour discussed above (§\ref{verona_cpp_ptr}) ensures than an
 `acquired_cown` can only be accessed when that cown is acquired, this doesn't
@@ -501,7 +520,7 @@ underlying data from an `acquired_cown`, and nothing prevents that pointer being
 used to access the cown even after it's no longer acquired by the behaviour in
 which it was obtained.
 
-```cpp {.freefloat label="cpp-byppass-safety" caption="Accessing a cowns data when that cown isn't acqured"}
+```cpp {.freefloat label="cpp-bypass-safety" caption="Accessing a cowns data when that cown isn't acquired"}
 cown_ptr<int> my_cown = make_cown<int>(10);
 int* escape_data;
 when(my_cown) << [&escape_data](acquired_cown<int> my_cown) {
@@ -511,7 +530,7 @@ sleep(3); // Wait for behaviour to run
 *escape_data += 10; // Modifies cown without acquiring!!!
 ```
 
-Because users can access a cowns data when it it no longer acqured, the
+Because users can access a cowns data when it it no longer acquired, the
 `verona::cpp` implementation of BoC fails to provide the datarace freedom, even
 though the underlying BoC model it does. This is because C++ isn't expressive
 enough to encode the idea the an acquired cown (the BoC concept, not the C++
@@ -524,7 +543,7 @@ Rust can solve this with the power of lifetimes.
 <!-- TODO: Is this line a good idea? -->
 
 <!--
-### Other concurrency paradimes
+### Other concurrency paradise
 
 - Shared Memory
 - Message Passing
@@ -533,25 +552,149 @@ Rust can solve this with the power of lifetimes.
 - Structured Concurrency
 -->
 
-# Design
+# Design and Implementation of a Rust Library for Behaviour-Oriented Concurrency
+
+The `boxcars` library implements BoC cowns and behaviours on top of the
+`verona-rt` runtime.
+
+A significant challenge is that Rust code can't call C++ functions directly,
+only C ones.
+<!-- TODO: Something about monomorphization that these OS people will understand. -->
+
+```cpp
+verona::rt::Cown* boxcars_allocate_cown(verona::rt::Descriptor* desc)
+```
+
 
 ## Cowns {#design-cowns}
 
-The design of the Rust `Cown` API is as follows [^phantom]: 
+The first thing we need to do is have a `Cown` type that represents some data. 
+The cown will be a pointer to a heap allocation that contains:
 
-[^phantom]: `Cown` also has a `_marker: PhantomData<Mutex<T>>` field, but that's
-    not relavent here.
+1. Scheduling state
+2. Reference count
+3. The data.
 
-```rust
+1 and 2 should be managed by the `verona-rt` library, but it's unable to know
+about the user data. That's because the data is a generic parameter, and this
+won't work over FFI.
+
+The rust `Cown<T>` type is a wrapper over a `verona::rt::Cown*`. Note that the
+rust-side type caries type information, but the C++ side doesn't. That's because
+`T` can be any Rust type. The full declaration is given in listing \ref{boxcars-cownptr-decl} [^phantom].
+
+[^phantom]: The actuall declaration of `Cown` also has a
+    [`PhantomData`](https://doc.rust-lang.org/1.79.0/std/marker/struct.PhantomData.html)
+    field, but that's only relevant to the compiler, as disallows unused type parameters.
+
+```rust {.freefloat label="boxcars-cownptr-decl" caption="Declaration of \texttt{boxcars::Cown} type"}
 pub struct Cown<T> {
    cown_ptr: CownPtr,
 }
 
+/// a `verona::rt::Cown*`
 #[repr(transparent)]
-pub struct CownPtr {
+struct CownPtr {
    addr: *mut (),
 }
 ```
+
+`CownPtr` is kept as it's own type, as it's usefull for both `boxcars::Cown` and
+`boxcars::AcquiredCown`. It must be marked as `#[repr(transparent)]` to ensure
+it is treated like a pointer at an ABI level [@rust_reference].
+
+### Maintaining the Reference Count
+
+As `Cown<T>` is a reference-counted pointer to some on-heap `T`, we need to
+ensure the reference-count is maintained. Unlike `verona::cpp::cown_ptr`
+(§\ref{verona_cpp_ptr}), we cannot override constructors or assignment
+operators, as Rust only supports bitwise moves (§\ref{rust-ownership}).
+However, because Rust won't allow using a value after it's been moved from, we
+don't need this to maintain the refernce count.
+
+That said, we still want a way to duplicate a `Cown` and increment the reference
+count. For this, Rust uses the
+[`Clone`](https://doc.rust-lang.org/1.79.0/std/clone/trait.Clone.html) trait,
+which is used in broadly the same situations as a copy constructor in C++
+[^cpp_rust_clone_copy]. Similarly, we can implement the
+[`Drop`](https://doc.rust-lang.org/1.79.0/std/ops/trait.Drop.html) trait to
+decrement the reference count when the value goes out of scope. These
+implementations, show in listing \ref{cown-clone-impl} and \ref{cown-drop-impl},
+simply call into ffi code that can manipulate the reference count.
+
+[^cpp_rust_clone_copy]: Confusingly, what C++ calls "copyable"
+    ([`std::copyable`](https://en.cppreference.com/w/cpp/concepts/copyable)) is
+    equivalent to Rust's idea of "cloneable"
+    ([`std::clone::Clone`](https://doc.rust-lang.org/1.79.0/std/clone/trait.Clone.html)), both of which
+    broadly mean an object can be duplicated by potentially running code. Meanwhile what Rust call
+    "copyable" ([`std::marker::Copy`](https://doc.rust-lang.org/1.79.0/std/marker/trait.Copy.html)) instead coresponds to
+    C++'s idea of "trivially copyable" ([`std::is_trivially_copyable`](https://en.cppreference.com/w/cpp/types/is_trivially_copyable)),
+    both of which corespond to types that can be duplicated purely by duplicating the underling bytes.
+
+    This has caused endless confusion, as the difference between these two
+    concepts is super important, and the two languages with the most support for
+    this kind of thing choosing to use "copy" for the two different things is
+    extreamly unfortunate. 
+  
+    Speaking personally, I learn the Rust terminology far before the C++ one, and
+    think in terms of it.
+
+
+```rust {.freefloat label="cown-clone-impl" caption="\texttt{Clone} implementation for \texttt{boxcars::Cown}"}
+impl<T> std::clone::Clone for Cown<T> {
+    fn clone(&self) -> Self {
+        unsafe {
+            ffi::boxcars_acquire_object(self.cown_ptr);
+        }
+
+        Self {
+            cown_ptr: self.cown_ptr,
+            _marker: PhantomData,
+        }
+    }
+}
+```
+
+```rust {label="cown-drop-impl" caption="\texttt{Drop} implementation for \texttt{boxcars::Cown}"}
+impl<T> std::ops::Drop for Cown<T> {
+    fn drop(&mut self) {
+        unsafe { ffi::boxcars_release_object(self.cown_ptr) };
+    }
+}
+```
+
+Then on the C++ side, we have very simple helper functions, that forward to
+`verona-rt`'s reference-counting implementation (listing \ref{cpp-refcount}). We
+can't call the `verona::rt::Cown::acquire` static method directly from Rust, as
+they aren't declared as `extern "C"`, so will have mangled names that Rust code
+won't be able to link to. Importantly, despite the `Clone` and `Drop`
+implementation being generic over `T`, the `boxcars_acquire_object` and
+`boxcars_release_object` functions arn't, as they instead work on any type. This
+is becasue `boxcars` maintains a strict seperation, where the C++ side never
+knows about the Rust data being stored in cowns, and the Rust side doesn't know
+how the C++ represents the scheduling/reference-counting state of cowns.
+
+```c++ {label="cpp-refcount" caption="C++ side of reference counting"}
+using verona::rt::Cown;
+
+
+extern "C"
+{
+  void boxcars_acquire_object(Cown* o)
+  {
+    Cown::acquire(o);
+  }
+  void boxcars_release_object(Cown* o)
+  {
+    auto& alloc = verona::rt::ThreadAlloc::get();
+    Cown::release(alloc, o);
+  }
+}
+```
+
+
+
+### Construction and Destruction
 
 ![](./img/cown-layout.png)
 
@@ -729,7 +872,7 @@ users need to be aware that they're not dealing with a normal reference.
 ```rust {label="autoderef-example" caption="Demonstration of auto-deref"}
     let cown = Cown::<i32>::new(10);
 
-    // This type anotation isn't needed, but makes the coercion clearer
+    // This type annotation isn't needed, but makes the coercion clearer
     //                     vvvvvvvvvvvvvvvvv
     when(&cown, |acq_cown: AcquiredCown<i32>| {
         let n: i32 = *acq_cown; 
@@ -753,7 +896,7 @@ method calls, as shown in listing \ref{autoderef-methods}, where we can call
 This is possible because `AcquiredCown` implements the
 [`Deref`](https://doc.rust-lang.org/1.79.0/std/ops/trait.Deref.html) and
 [`DerefMut`](https://doc.rust-lang.org/1.79.0/std/ops/trait.DerefMut.html)
-traits. The rust compiller will implicitly insert calls to these traits' methods to
+traits. The rust compiler will implicitly insert calls to these traits' methods to
 allow a `AcquiredCown<T>` to be treated like an `&mut T`. This normally works
 seamlessly, as shown in listings \ref{autoderef-example} and
 \ref{autoderef-methods}.
@@ -773,13 +916,13 @@ let mut foo = Foo { a: 1, b: 1 };
 use_ints(&mut foo.a, &mut foo.b);
 ```
 
-However, this abstraction doesn't alway hold. The code in listing
-\ref{partial-works} compiles and executes successfully. Unfortunatly a naïve
+However, this abstraction doesn't always hold. The code in listing
+\ref{partial-works} compiles and executes successfully. Unfortunately a naïve
 translation of this code to BoC (listing \ref{needs-partial}) fails to compile, giving the error shown in 
 \ref{multiborrow-error}.
 
 
-```rust {label="needs-partial" caption="Attempting to borrow two fields of a struct in a cown."}
+```rust {label="needs-partial" caption="Attempting to borrow two fields of a struct in a cown"}
 let cown = Cown::new(Foo { a: 1, b: 1 });
 when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
   use_ints(&mut acq_cown.a, &mut acq_cown.b)
@@ -799,10 +942,10 @@ error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
 For more information about this error, try `rustc --explain E0499`.
 ```
 
-This occors because the compiller inserts calls to the the `deref_mut` method,
+This occors because the compiler inserts calls to the the `deref_mut` method,
 to convert from `&mut AcquiredCown<Foo>` (which doesn't have fields `a` or `b`)
 to `&mut Foo` (which does). This happens both time `acq_cown` is dereferences,
-with the compiller desugaring it into the code given in listing \ref{autoderef-desugared}.
+with the compiler desugaring it into the code given in listing \ref{autoderef-desugared}.
 
 ```rust {label="autoderef-desugared" caption="The desugaring of the call to \texttt{use\\_ints} in listing \ref{needs-partial}"}
 use_ints(
@@ -811,7 +954,7 @@ use_ints(
 )
 ```
 
-This code has a compiller error (listing \ref{autoderef-desugared-err}), as it
+This code has a compiler error (listing \ref{autoderef-desugared-err}), as it
 attempts to borrow `acq_cown` mutably twice. Why then does listing
 \ref{partial-works} compile, when it seemingly does the same thing? The answer
 is that the borrow checker is able to understand that we are borrowing disjoint fields of a struct, and therefor
@@ -821,7 +964,7 @@ However, when borrowing from an `AcquiredCown<T>` (instead of a `&mut T`), we
 must first borrow the _entire_ cown to pass to the `deref_mut` method. Only then
 can we borrow the individual field that we want. At the time of the call the the
 `deref_mut` call, we have borrowed _all_ of `acq_cown`. Whereas in listing
-\ref{partial-works}, we never borrow all of `foo`, only it's invidual fields.
+\ref{partial-works}, we never borrow all of `foo`, only it's individual fields.
 
 ```{caption="\captionerr{autoderef-desugared}" label="autoderef-desugared-err"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
@@ -847,7 +990,7 @@ when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
 });
 ```
 
-Here, deref coersion only once, on the second line get `mut_ref`. Then on the
+Here, deref coercion only happens once, on the second line get `mut_ref`. Then on the
 third line, we partial can split the borrow on `mut_ref` to get the two fields
 we want. This is allowed, because there's no hidden function calls here, so the
 borrow checker can locally check that we're obeying Aliasing XOR Mutation.
@@ -961,7 +1104,7 @@ help: swap these arguments
 For more information about this error, try `rustc --explain E0308`.
 ```
 
-Which is much more understandable, as it doesn't need to take a detour through the templated libary code.
+Which is much more understandable, as it doesn't need to take a detour through the templated library code.
 <!-- TODO: More here about not needing std::forward -->
 
 ### Wrong Args
@@ -973,7 +1116,7 @@ auto a = make_cown<uint32_t>(101);
 when(a) << [](acquired_cown<bool> a) {};
 ```
 
-This causes C++ compillers to spew out the internals of the `when` implementation, because the type signature isn't part of then `when` function:
+This causes C++ compilers to spew out the internals of the `when` implementation, because the type signature isn't part of then `when` function:
 
 ```
 In file included from cpp/playground.cc:1:
@@ -1026,7 +1169,7 @@ note: required by a bound in `when`
 For more information about this error, try `rustc --explain E0631`.
 ```
 
-### Rustc being helpfull and unhelpfull
+### Rustc being helpful and unhelpfull
 
 ```rust
 let foo = Cown::new(101);
@@ -1053,7 +1196,7 @@ help: change the closure to accept a tuple instead of individual arguments
    |  
 ```
 
-However, not all cases can be caught, and you definatly can still get unhelpfull error messages:
+However, not all cases can be caught, and you definitely can still get unhelpfull error messages:
 
 ```rust
 let foo = Cown::new(101);
@@ -1122,14 +1265,14 @@ For more information about this error, try `rustc --explain E0277`.
 ```
 
 The root of the problem is that you need to borrow these `Cown`s to form a
-`CownCollection`. However, becasue `when`s first argument is generic, `rustc`
+`CownCollection`. However, because `when`s first argument is generic, `rustc`
 can't say what type it needs to be, only that it must implement a certain trait.
 This also causes a followup error, where it claims that the function has the
 wrong signature, because it can't find the correct one.
 
 ## auto-copy vs explicit clone.
 
-In C++, the `cown_ptr` class overloads it's copy and assignment constructor to automaticly update the reference count:
+In C++, the `cown_ptr` class overloads it's copy and assignment constructor to automatically update the reference count:
 
 ```c++
 // class cown_ptr {
@@ -1157,7 +1300,7 @@ This means that the following code Just Works:
 
 ```c++
 auto c1 = make_cown<int>(10);
-auto c2 = c1; // copy constuctor
+auto c2 = c1; // copy constructor
 c2 = c1; // copy-assignment operator
 ```
 

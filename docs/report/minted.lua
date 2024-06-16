@@ -418,8 +418,15 @@ function CodeBlock(block)
     )
 
     -- Alona(2024-06-15): Use a listing here.
-    -- TODO: Use [h] instead?
-    local r = "\\begin{listing}[h]\n"
+    local r = "\\begin{listing}["
+    if block.classes.freefloat then
+      r = r.."h"
+    else
+      -- TODO: Use [h] instead?
+      r = r.."H"
+    end
+    r = r.."]\n"
+
     local s_caption = block.attributes.caption
     local s_label = block.attributes.label 
 

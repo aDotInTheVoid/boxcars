@@ -72,7 +72,7 @@ destructors.
 \end{abstract}
 {
 \hypersetup{linkcolor=}
-\setcounter{tocdepth}{3}
+\setcounter{tocdepth}{2}
 \tableofcontents
 }
 ```
@@ -104,42 +104,127 @@ Foo = \ref{code:foo}. Bar = \ref{code:bar}.
 
 ## Rust
 
-Rust [@rust_book] is a programming language originally developed by Mozilla Research,
-and currently maintained by a large cross-org team.
+Rust [@rust_book] is a systems programming language.
+
+It has type safety, memory safety and freedom from data-races.
 
 Rust's most important feature (for our purposes) is its system of **Ownership & Borrowing**.
 
-### Ownership & Borrowing: A very fast introduction.
+### Ownership & Borrowing
 
-(A full tutorial on ownership and borrowing is beyond the scope of this report. See [@rust_book] for details.)
-The core idea of **ownership** is that each value has a unique owner, and that value is dropped when the
-owner goes out of scope. To quote The Book [@rust_book]:
+While a full tutorial on ownership and borrowing (and Rust more broadly) is well
+beyond the scope of this report, it is important to understand the principles at
+work, as they inform much of the later design. The core idea of **ownership** is
+that each value has a unique owner, and that value is dropped when the owner
+goes out of scope. To quote The Book [@rust_book]:
 
 > - Each value in Rust has an owner.
 > - There can only be one owner at a time.
 > - When the owner goes out of scope, the value will be dropped.
 
-However with only these rules, programming in Rust would be extremely
-uneconomic. If a function took a string as a parameter, it would have "take
-ownership" of that value, so the calling function could no longer use it.
-[^return_values]
+Using just these rules, Rust could offer a type-safe and memory-safe programming
+language. However, it would be extreamly cumbersome to program in. For example,
+if a function took a paramater, that function would become the owner of that
+parameter, and the value would no longer be able to be used.
 
-[^return_values]: This could be circumvented by having a function return back it's args to the caller, but this would
-be extremely cumbersome.
 
-Therefore, Rust introduces the additional notion of **borrowing**. A value can be borrowed in
-one of two ways: by a shared reference (spelt `&T`), or an exclusive reference (`&mut T`). These are
-also sometimes referred to as a immutable or mutable reference respectively [@dtolnay_ref].
+```rust {.freefloat caption="A demonstration of ownership" label="own1"}
+let x: String = make_string();  // `x` owns a `String`
+do_thing_with_string(x);        // ownership of `x` transfered
+do_other_thing_with_string(x);  // `x` cannot be used here
+```
+
+For example, in listing \ref{own1}, the variable `x` is the owner of a value of
+type `String`. However, when calling `do_thing_with_string`, ownership is
+moved (or _transfered_) to that function. This means that the value cannot be used in the
+call to `do_other_thing_with_string`. Indeed, this is what the compiller error
+in listing \ref{own1-err} shows us.
+
+```text {.freefloat .breaklines caption="Compiller error for listing \ref{own1}" label="own1-err"}
+error[E0382]: use of moved value: `x`
+  --> src/main.rs:4:32
+   |
+2  | let x: String = make_string();
+   |     - move occurs because `x` has type `String`, which does not implement the `Copy` trait
+3  | do_thing_with_string(x);
+   |                      - value moved here
+4  | do_other_thing_with_string(x);
+   |                            ^ value used here after move
+   |
+```
+
+This is in different to C++, where objects can be used after they are `std::move`d
+from. However, the standard places no gaurentees on the content of those
+objects, only saying "moved-from objects shall be placed in a valid but
+unspecified state" [@cppstd].
+
+To avoid this constantly becoming a footgun for users, C++ values won't be moved
+by default, but instead will be copied, which leaves the origional value intact.
+This is shown by \ref{cpp-copy}, where `x` is used both
+ values are copied by default.
+
+```cpp {.freefloat label="cpp-copy" caption="Demonstration of copies in C++"}
+std::string x = make_string();
+do_thing_with_string(x);       // `x` copied into `do_thing_with_string`
+do_other_thing_with_string(x); // `x` still has it's contents here and can be used
+```
+
+If you want to move a value (and not pay the cost of creating a new value), C++
+makes you do this explicitly, by calling the `std::move` function, as shown in
+listing \ref{cpp-move}. However, unlike the Rust equivalent (listing \ref{own1})
+this does compile, but `do_other_thing_with_string` can be passed _any_ value [^uam_in_practice].
+
+[^uam_in_practice]: In practice, this will be the empty string, but well written
+    programs should not rely on this behaviour.
+
+```cpp {.freefloat label="cpp-move" caption="Demonstration of moves in C++"}
+std::string x = make_string();
+do_thing_with_string(std::move(x)); // `x` copied into `do_thing_with_string`
+do_other_thing_with_string(x);      // `x` "valid but unspecified" here.
+```
+
+In order to support this, C++ has a concept of copy and move constructors
+[^assign_op], which allow users to run custom code whenever a value is moved (eg
+to set the moved-from allocation to `NULL`) or copied (eg to create a new
+allocation). In contrast, Rust moves are always bitwize (ie the result of
+`memcpy`ing the value from the old to new location). However, as the old value
+is gaurenteed to never be accessed, libraries don't need to modify it on the way
+out, to avoid use-after-free.
+
+#### Borrowing
+
+If values could only be owned and moved, than programming in Rust would be
+extreamly unergonomic. As shown, all values could only be used by a function
+once, and then would no longer be accessable [^return_values].
+
+[^return_values]: This could be  somehwat circumvented by having a function
+return back it's arguments to the caller, but this would be extremely
+cumbersome.
+
+Therefore [^other_reasons], Rust has the additional notion of **borrowing**. A
+value can be borrowed in one of two ways: by a immutable reference (spelt `&T`), or
+an mutable reference (`&mut T`). 
+
+[^other_reasons]: And for other reasons as well.
 
 A value may have many shared references to it at a given time, but if it has any
 exclusive reference to it that reference must be the only one. With a shared
 reference, you can only read from the value. An exclusive reference is required
-to mutate it. More succinctly, Rust references are "Aliasable XOR mutable" [@boats_smaller].
+to mutate it. More succinctly, Rust references are "Aliasable XOR mutable"
+[@boats_smaller]. The fact that a immutable reference can be shared, while a
+mutable reference must be exclusive has lead to these sometimes being call
+shared references (for `&T`) and exclusive references (for `&mut T`)
+[@dtolnay_ref].
 
-Borrowed values have a **lifetime** for which they are borrowed. This is needed to ensure
-that all exclusive references don't overlap with shared ones.
+Borrowed values have a **lifetime** for which they are borrowed. This is needed
+to ensure that all exclusive references don't overlap with shared ones. This is
+enforces by a part of the compiller called the "borrow checker", that assigns a
+lifetime to each borrow, and uses this to determine if there are ever any
+aliased mutable borrows. Listing \ref{lifetime_demo} contains an example of the
+lifetimes assigned to various borrows.
+ 
 
-```rust
+```rust {.freefloat caption="Demonstration of lifetimes" label="lifetime_demo"}
 let x: i32 = 0;
 
 let shared_1: &i32 = &x; // Lifetime 1 starts
@@ -147,11 +232,11 @@ dbg!(shared_1);
 // Lifetime 1 stops.
 
 let exclusive_2: &mut i32 = &mut x; // Lifetime 2 starts
-// Would be compiler error to borrow x here.
+// Would be compiler error to borrow `x` here, as it's already borrowed by `exclusive_2`
 *exclusive_2 += 10;
 // Lifetime 2 ends
 
-// But now that lifetime 2 is over, we can borrow again
+// But now that lifetime 2 is over, we can borrow `x` again
 
 let shared_3: &i32 = &x; // Lifetime 3 starts
 let shared_4: &i32 = &x; // Lifetime 4 starts
@@ -162,20 +247,23 @@ dbg!(shared_3);
 // Lifetime 3 ends
 ```
 
-This is also used to ensure that references don't outlive the objects they borrow.
+Because the borrow checker knows what values each borrow is borrowing from, it
+is able to ensure that borrows are not instead of doing UB like it would in C++.
+Listing \ref{rust-uaf} attemts to use a borrow to `short_lived` after it's gone
+out of scope (and therefore dropped). This is caught by the compiller, as shown
+be the error in listing \ref{rust-uaf-err}, whereas in C++ it would be undefined
+behaviour.
 
-```rust
+```rust {.freefloating label="rust-uaf" caption="Attempting to use a reference to a value that's out of scope"}
 let mut x: &i32 = 0;
 {
     let short_lived: i32 = 0;
     x = &short_lived;
-} // short_lived goes out of scope here.
+} // `short_lived` goes out of scope here.
 dbg!(x);
 ```
 
-will error with
-
-```
+```text {.freefloating label="rust-uaf-err" caption="\captionerr{rust-uaf}"}
 error[E0597]: `short_lived` does not live long enough
  --> src/main.rs:5:13
   |
@@ -189,7 +277,6 @@ error[E0597]: `short_lived` does not live long enough
   |          - borrow later used here
 ```
 
-instead of doing UB like it would in C++.
 
 ### Consequence of this: No iterator invalidation
 
@@ -692,7 +779,7 @@ when(&cown, |mut acq_cown: AcquiredCown<Foo>| {
 });
 ```
 
-```{caption="Compiller error of listing \ref{needs-partial}" label="multiborrow-error"}
+```{caption="\captionerr{needs-partial}" label="multiborrow-error"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
  --> crates/verona-rt/examples/play.rs:6:40
   |
@@ -710,7 +797,7 @@ to convert from `&mut AcquiredCown<Foo>` (which doesn't have fields `a` or `b`)
 to `&mut Foo` (which does). This happens both time `acq_cown` is dereferences,
 with the compiller desugaring it into the code given in listing \ref{autoderef-desugared}.
 
-```rust {label="autoderef-desugared" caption="The desugaring of the call to \texttt{use_ints} in listing{needs-partial}"}
+```rust {label="autoderef-desugared" caption="The desugaring of the call to \texttt{use\\_ints} in listing \ref{needs-partial}"}
 use_ints(
     &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).a,
     &mut <AcquiredCown<Foo> as DerefMut>::deref_mut(&mut acq_cown).b,
@@ -729,7 +816,7 @@ can we borrow the individual field that we want. At the time of the call the the
 `deref_mut` call, we have borrowed _all_ of `acq_cown`. Whereas in listing
 \ref{partial-works}, we never borrow all of `foo`, only it's invidual fields.
 
-```{caption="The compiller error from listing \ref{autoderef-desugared}" label="autoderef-desugared-err"}
+```{caption="\captionerr{autoderef-desugared}" label="autoderef-desugared-err"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
   --> tests/ui/partial-borrow.rs:30:65
    |

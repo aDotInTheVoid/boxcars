@@ -2,7 +2,7 @@ use core::{fmt, marker::PhantomData, ptr};
 
 use verona_rt_sys as ffi;
 
-use crate::descriptor::get_desc;
+use crate::descriptor::get_descriptor;
 
 /// A piece of concurrently owned data.
 ///
@@ -54,14 +54,15 @@ impl<T> core::ops::Drop for Cown<T> {
     }
 }
 
-impl<T> Clone for crate::cown::Cown<T> {
+impl<T> Clone for Cown<T> {
     fn clone(&self) -> Self {
         unsafe {
             ffi::boxcars_acquire_object(self.cown_ptr);
-            Self {
-                cown_ptr: self.cown_ptr,
-                _marker: PhantomData,
-            }
+        }
+
+        Self {
+            cown_ptr: self.cown_ptr,
+            _marker: PhantomData,
         }
     }
 }
@@ -71,7 +72,7 @@ impl<T> Cown<T> {
     // TODO: Enforce that.
     pub fn new(value: T) -> Self {
         unsafe {
-            let desc = get_desc::<CownData<T>>();
+            let desc = get_descriptor::<CownData<T>>();
             let cown_ptr = ffi::boxcars_allocate_cown(desc);
 
             let this = Self {

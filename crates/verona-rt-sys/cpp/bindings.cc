@@ -532,7 +532,7 @@ extern "C"
     *charx17size = verona::rt::vsizeof<std::array<char, 17>>;
   }
 
-  Cown* boxcars_allocate_cown(Descriptor* desc)
+  verona::rt::Cown* boxcars_allocate_cown(Descriptor* desc)
   {
     size_t size = desc->size;
     void* base = snmalloc::ThreadAlloc::get().alloc(size);

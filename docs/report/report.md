@@ -692,11 +692,66 @@ extern "C"
 }
 ```
 
-
-
 ### Construction and Destruction
 
+The remaining operations are creating a new `Cown`, and running the destructor
+on the underlying data once the reference-count reaches zero. It turns out these
+are closely related.
+
+<!-- TODO: Link to background::verona_rt::rt::descriptor if that get's written. -->
+
+The core problem when creating a `Cown` was that the `verona::rt::Cown` could
+only be created from C++, but C++ couldn't know about the `T` in a
+`boxcars::Cown<T>`. However, we need to know what `T` in order to create an
+approprietly sized heap allocation. But this is the only propery that's
+required, and we can communicate this via a simple paramater of type `size_t`
+(instead of needing to template). The C++ size will do a heap allocation of the
+requested size, and initialize a `verona::rt::Cown` at the top of it. It can
+then pass a pointer to this allocation back to Rust, which moves it's `T` to the
+bottom.
+
+This is implemented in listing \ref{rs-cown-new}. It creates a descriptor of the cown it would like
+(which includes the size), and then passes that over to C++. The C++ only initialized the `verona::rt::Cown`,
+Then the Rust moves `value` into that heap allocation using [`std::ptr::write`](https://doc.rust-lang.org/1.79.0/std/ptr/fn.write.html)
+
+```rust {.freefloat label="rs-cown-new" caption="Implementation of \texttt{boxcars::Cown::new}"}
+impl<T> Cown<T> {
+    pub fn new(value: T) -> Self {
+        unsafe {
+            let desc = get_descriptor::<CownData<T>>();
+            let cown_ptr = ffi::boxcars_allocate_cown(desc);
+            let this = Self { cown_ptr };
+            std::ptr::write(this.data_ptr(), value);
+            this
+        }
+    }
+}
+```
+
+<!-- TODO: Explain CownData<T>? -->
+
+Figure \ref{boxcars-cown-diagram} shows what this looks like in memory. The
+single heap allocation for a cown contains both the `verona::rt::Cown`, which
+stores scheduling and reference counting information, as well as the users data.
+It also has a pointer to a (per-type) descriptor. This descriptor stores a
+pointer to the destructor function, which is called when the reference count
+reaches 0.
+
+```{=latex}
+\begin{figure}[h]
+```
 ![](./img/cown-layout.png)
+```{=latex}
+\caption{In-memory layout of a Cown}
+\label{boxcars-cown-diagram}
+\end{figure}
+```
+
+The rust `get_descriptor` function returns a pointer to a staticly-allocated
+descriptor. It contains the size needed for the underlying heap allocation, as
+well as a pointer to the type-eraised destructor that will run the destructor
+for the Rust-managed data after the reference-count reaches 0, but before the
+cown's allocation is freed.
 
 ## Behaviours {#design-behaviours}
 

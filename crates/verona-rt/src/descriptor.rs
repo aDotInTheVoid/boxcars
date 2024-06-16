@@ -9,7 +9,7 @@ extern "C" fn drop_glue_for<T>(obj: *mut ffi::Object) {
 
 extern "C" fn noop_trace(_o: *const ffi::Object, _os: *mut ffi::ObjectStack) {}
 
-pub(crate) const fn get_desc<T>() -> &'static ffi::Descriptor {
+pub(crate) const fn get_descriptor<T>() -> &'static ffi::Descriptor {
     //                 ______
     //           _____/      \\_____
     //          |  _     ___   _   ||
@@ -38,10 +38,10 @@ pub(crate) const fn get_desc<T>() -> &'static ffi::Descriptor {
 
 #[test]
 fn descriptor_ptr_eq() {
-    let i1 = get_desc::<i32>();
-    let i2 = get_desc::<i32>();
-    let v1 = get_desc::<Vec<i32>>();
-    let v2 = get_desc::<Vec<i32>>();
+    let i1 = get_descriptor::<i32>();
+    let i2 = get_descriptor::<i32>();
+    let v1 = get_descriptor::<Vec<i32>>();
+    let v2 = get_descriptor::<Vec<i32>>();
 
     assert!(ptr::eq(i1, i2));
     assert!(ptr::eq(v1, v2));

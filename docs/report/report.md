@@ -583,7 +583,7 @@ The rust `Cown<T>` type is a wrapper over a `verona::rt::Cown*`. Note that the
 rust-side type caries type information, but the C++ side doesn't. That's because
 `T` can be any Rust type. The full declaration is given in listing \ref{boxcars-cownptr-decl} [^phantom].
 
-[^phantom]: The actuall declaration of `Cown` also has a
+[^phantom]: The actual declaration of `Cown` also has a
     [`PhantomData`](https://doc.rust-lang.org/1.79.0/std/marker/struct.PhantomData.html)
     field, but that's only relevant to the compiler, as disallows unused type parameters.
 
@@ -599,7 +599,7 @@ struct CownPtr {
 }
 ```
 
-`CownPtr` is kept as it's own type, as it's usefull for both `boxcars::Cown` and
+`CownPtr` is kept as it's own type, as it's useful for both `boxcars::Cown` and
 `boxcars::AcquiredCown`. It must be marked as `#[repr(transparent)]` to ensure
 it is treated like a pointer at an ABI level [@rust_reference].
 
@@ -610,7 +610,7 @@ ensure the reference-count is maintained. Unlike `verona::cpp::cown_ptr`
 (§\ref{verona_cpp_ptr}), we cannot override constructors or assignment
 operators, as Rust only supports bitwise moves (§\ref{rust-ownership}).
 However, because Rust won't allow using a value after it's been moved from, we
-don't need this to maintain the refernce count.
+don't need this to maintain the reference count.
 
 That said, we still want a way to duplicate a `Cown` and increment the reference
 count. For this, Rust uses the
@@ -627,14 +627,14 @@ simply call into ffi code that can manipulate the reference count.
     equivalent to Rust's idea of "cloneable"
     ([`std::clone::Clone`](https://doc.rust-lang.org/1.79.0/std/clone/trait.Clone.html)), both of which
     broadly mean an object can be duplicated by potentially running code. Meanwhile what Rust call
-    "copyable" ([`std::marker::Copy`](https://doc.rust-lang.org/1.79.0/std/marker/trait.Copy.html)) instead coresponds to
+    "copyable" ([`std::marker::Copy`](https://doc.rust-lang.org/1.79.0/std/marker/trait.Copy.html)) instead corresponds to
     C++'s idea of "trivially copyable" ([`std::is_trivially_copyable`](https://en.cppreference.com/w/cpp/types/is_trivially_copyable)),
-    both of which corespond to types that can be duplicated purely by duplicating the underling bytes.
+    both of which correspond to types that can be duplicated purely by duplicating the underling bytes.
 
     This has caused endless confusion, as the difference between these two
     concepts is super important, and the two languages with the most support for
     this kind of thing choosing to use "copy" for the two different things is
-    extreamly unfortunate. 
+    extremely unfortunate. 
   
     Speaking personally, I learn the Rust terminology far before the C++ one, and
     think in terms of it.
@@ -670,7 +670,7 @@ they aren't declared as `extern "C"`, so will have mangled names that Rust code
 won't be able to link to. Importantly, despite the `Clone` and `Drop`
 implementation being generic over `T`, the `boxcars_acquire_object` and
 `boxcars_release_object` functions arn't, as they instead work on any type. This
-is becasue `boxcars` maintains a strict seperation, where the C++ side never
+is because `boxcars` maintains a strict separation, where the C++ side never
 knows about the Rust data being stored in cowns, and the Rust side doesn't know
 how the C++ represents the scheduling/reference-counting state of cowns.
 
@@ -703,8 +703,8 @@ are closely related.
 The core problem when creating a `Cown` was that the `verona::rt::Cown` could
 only be created from C++, but C++ couldn't know about the `T` in a
 `boxcars::Cown<T>`. However, we need to know what `T` in order to create an
-approprietly sized heap allocation. But this is the only propery that's
-required, and we can communicate this via a simple paramater of type `size_t`
+appropriately sized heap allocation. But this is the only property that's
+required, and we can communicate this via a simple parameter of type `size_t`
 (instead of needing to template). The C++ size will do a heap allocation of the
 requested size, and initialize a `verona::rt::Cown` at the top of it. It can
 then pass a pointer to this allocation back to Rust, which moves it's `T` to the
@@ -747,7 +747,7 @@ reaches 0.
 \end{figure}
 ```
 
-The rust `get_descriptor` function returns a pointer to a staticly-allocated
+The rust `get_descriptor` function returns a pointer to a statically-allocated
 descriptor. It contains the size needed for the underlying heap allocation, as
 well as a pointer to the type-eraised destructor that will run the destructor
 for the Rust-managed data after the reference-count reaches 0, but before the

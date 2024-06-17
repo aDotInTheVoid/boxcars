@@ -542,13 +542,13 @@ Rust can solve this with the power of lifetimes.
 `verona::rt` is a lower-level API that is used to implement the `verona::cpp`
 API. While it still has Cowns, they arn't typed at all. It instead just exposes
 the `verona::rt::Cown` type. Higher level API's can use it's implementation of
-reference-counting and scheduling, but they themselves are responcible for
+reference-counting and scheduling, but they themselves are responsible for
 calling `verona::rt::Cown`s methods to change the reference-count, and schedule.
 
 Additionally, `verona::rt::Cown` doesn't encode any information about the data
-it contains. Higher level users are responcible for placing this alongside the
+it contains. Higher level users are responsible for placing this alongside the
 `verona::rt::Cown` (ideally in the same allocation), and then making this data
-only accessable inside behaviours that have acquired that cown.
+only accessible inside behaviours that have acquired that cown.
 
 # Design and Implementation of a Rust Library for Behaviour-Oriented Concurrency
 

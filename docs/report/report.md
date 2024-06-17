@@ -86,7 +86,7 @@ earlier draft of this report. All remaining errors are mine.
 }
 ```
 
-<!-- TOOD: Introduction??? -->
+<!-- TODO: Introduction??? -->
 
 # Background
 
@@ -792,7 +792,7 @@ This contains mainy things.
 ```
 
 [^why_work_and_behaviourcore]: This begs the question: Why are `Work` and
-    `BehaviourCore` seperate? `verona-rt` wants to explore scheduling things
+    `BehaviourCore` separate? `verona-rt` wants to explore scheduling things
     that arn't behaviours, and uses this as a common abstraction.
 
 To create a behaviour, the low-level function is `boxcars_sched_lambda`, whose
@@ -801,7 +801,7 @@ In creates a behaviour structure (shown in figure \ref{boxcars-behaviour-diagram
 `cowns`[^not_slice], `payload_size` bytes of payload copied from payload, and `f` as the pointer that will be invoked when all cowns are acquired.
 
 [^not_slice]: We can't use a slice of cowns (`&[CownPtr]`) here, because Rust
-    slices don't have a well-defined ABI. Instead we decompose it into its raw parts (a pointer and a lenght), and pass those individually.
+    slices don't have a well-defined ABI. Instead we decompose it into its raw parts (a pointer and a length), and pass those individually.
 
 ```rust {caption="Rust-side declaration of \texttt{boxcars\\_sched\\_lambda}" label="boxcars-sched-lambda"}
 extern "C" {
@@ -823,7 +823,7 @@ alas.
 
 ### Invocation Trampoline
 
-The function passed as `f` here can't be the users closure they passed to `when`, as that expects to recieve `AcquiredCown`s. Instead, always use the `invoke_trampoline` (listing \ref{invoke-tramp-sig}) function. It's instanciated with a different `F` for each different closure. How it works is
+The function passed as `f` here can't be the users closure they passed to `when`, as that expects to receive `AcquiredCown`s. Instead, always use the `invoke_trampoline` (listing \ref{invoke-tramp-sig}) function. It's instantiated with a different `F` for each different closure. How it works is
 
 ```rust {label="invoke-tramp-sig" caption="Signature of \texttt{invoke\\_trampoline}"}
 extern "C" fn invoke_trampoline<F>(work: WorkPtr)
@@ -833,7 +833,7 @@ where
 
 1. Taking the pointer to `Work` (as the other data stored after it, see figure \ref{boxcars-behaviour-diagram}), as using that to find
     - The pointer to the start of the slots array
-    - The lenght of the slots array
+    - The length of the slots array
     - The pointer to the start of the payload, where the closure's captures are stored.
 2. Invoke the closure.
 
@@ -928,14 +928,14 @@ differences between `boxcars` and `verona-rt`, but instead I was somehow doing
 less work. This was indeed the case, as C++ will implicitly call the
 copy-constructor on `cown_ptr`, but Rust makes this explicit by calling
 `.clone()`. Because this extra reference-counting was made explicit, I'd avoided
-it in my inital Rust, but it happened in C++.
+it in my initial Rust, but it happened in C++.
 
-I eneded up with 4 implementations:
+I ended up with 4 implementations:
 
-1. **careful boxcars**: My origional Rust implementation (listing \ref{fib-rs-careful}).
-2. **uncareful verona**: My origional C++ implementation, that does unnessessary refernce-counting (listing \ref{fib-cpp-uncareful}).
-3. **careful verona**: A C++ implementation that avoids unnessesary reference-counting (listing \ref{fib-cpp-careful}).
-4. **uncareful boxcars**: A Rust implementation that adds the unnessesary reference-counting from 2 (listing \ref{fib-rust-uncareful}).
+1. **careful boxcars**: My original Rust implementation (listing \ref{fib-rs-careful}).
+2. **uncareful verona**: My original C++ implementation, that does unnecessary reference-counting (listing \ref{fib-cpp-uncareful}).
+3. **careful verona**: A C++ implementation that avoids unnecessary reference-counting (listing \ref{fib-cpp-careful}).
+4. **uncareful boxcars**: A Rust implementation that adds the unnecessary reference-counting from 2 (listing \ref{fib-rust-uncareful}).
 
 \begin{figure}[h]
 \includegraphics{./plot/fibonacci.pdf}
@@ -945,7 +945,7 @@ I eneded up with 4 implementations:
 
 The performance of these is compared in figure \ref{g-fib}. Both the careful
 implementations have almost exactly the same performance, while both the
-uncareful ones do significatly worse.
+uncareful ones do significantly worse.
 
 ```rust {.freefloat caption="Implementation of `careful boxcars' from figure \ref{g-fib}" label="fib-rs-careful"}
 fn par_fib_careful(n: u32, result: &Cown<u32>) {
@@ -1173,12 +1173,12 @@ undefined-behaviour in Rust.
 
 <!-- TODO: Link to acq_cown creation discussion -->
 
-To avoid this, `boxcars` will panic [^panic] when attempting to schdule a
+To avoid this, `boxcars` will panic [^panic] when attempting to schedule a
 behaviour onto the same cown twice. The output of this is shown is
 \ref{twocown-ub-output}.
 
 [^panic]: To panic in Rust is to throw a non-recoverable error. It's like aborting, but with a bit more
-    debuging machinery around it.
+    debugging machinery around it.
 
 ```rust {.freefloat caption="Attempting to acquire the same cown twice, to obtain aliasing mutable references" label="twocown-ub"}
 let c = Cown::new(10);
@@ -1200,11 +1200,11 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 Both `verona-rt` and `boxcars` are make extensive use of the type-system to
 ensure users code is correct. This means that when a user makes a mistake, this
 is often communicated to them in the form of a type error. In general, Rust (and
-`boxcars` by extension) is able to produces beter type errors because it checks
+`boxcars` by extension) is able to produces better type errors because it checks
 generics as soon as they're called, rather than instantiating templates and then
 checking them.
 
-Note: Compiller errors are from `g++ 13.2.0` and `rustc 1.79.0`. They will be
+Note: Compiler errors are from `g++ 13.2.0` and `rustc 1.79.0`. They will be
 slightly different on different versions.
 
 ### Wrong Cown Constructor Arguments
@@ -1212,7 +1212,7 @@ slightly different on different versions.
 The most frequent type error I ran into when writing the benchmarks was getting
 the wrong arguments to a constructor wrong. When the same mistake is made in
 both C++ (listing \ref{cpp-wrong-ctor}) and Rust (\ref{rust-wrong-ctor}), they
-both produce a compiller error (listings \ref{cpp-wrong-ctor-err} and
+both produce a compiler error (listings \ref{cpp-wrong-ctor-err} and
 \ref{rust-wrong-ctor-err} respectively).
 
 ```c++ {caption="Calling a constructor with the wrong arguments with \texttt{verona\\_rt}" label="cpp-wrong-ctor"}
@@ -1295,7 +1295,7 @@ help: swap these arguments
 ### Wrong When Lambda Argument Type
 
 Another mistake, though less frequent, was expecting to get an acquired cown with a different type to the one being acquired.
-When this in done in C++ (listing \ref{cpp-wrong-acq}), it causes the compiller to spew out the internal of the `when` implementation
+When this in done in C++ (listing \ref{cpp-wrong-acq}), it causes the compiler to spew out the internal of the `when` implementation
 (\ref{cpp-wrong-acq-err})
 
 ```c++ {.freefloat label="cpp-wrong-acq" caption="Giving the wrong type for \texttt{acquired\\_cown} in \texttt{verona\\_rt}"}
@@ -1328,7 +1328,7 @@ Whereas when this same mistake is made in Rust (listing \ref{rust-wrong-acq}), t
 ```rust {label="rust-wrong-acq" caption="Giving the wrong type for \texttt{AcquiredCown} in \texttt{boxcars}"}
 let a = Cown::<u32>::new(101);
 
-// `a` shoud be of type `AcquiredCown<u32>`, not `AcquiredCown<bool>`
+// `a` should be of type `AcquiredCown<u32>`, not `AcquiredCown<bool>`
 when(&a, |a: AcquiredCown<bool>| {});
 ```
 
@@ -1361,7 +1361,7 @@ This error's not applicable to `verona-rt`, but in boxcars
 When acquiring multiple cowns, the argument to the lambda is a tuple of all the
 acquired cowns. However sometimes I typo'd (or forgot) this, and wrote out the
 arguments expecting to get all the cowns in different arguments, as shown in
-listing \ref{non-tup-args}. Fortunatly, because `rustc` knows exactly what type
+listing \ref{non-tup-args}. Fortunately, because `rustc` knows exactly what type
 is expected at the call sight, it's able to produce a really great error
 (listing \ref{non-tup-args-err}) that suggests how to fix this mistake.
 
@@ -1391,7 +1391,7 @@ help: change the closure to accept a tuple instead of individual arguments
 ### Passing Wrong Arguments as Cowns
 
 However there are some cases where `boxcars` can cause a quite unhelpful error
-to be emited. For example, listing \ref{no-ref} passes a tuple of cowns, instead
+to be emitted. For example, listing \ref{no-ref} passes a tuple of cowns, instead
 of a tuple of references to cowns. This causes the error given in listing
 \ref{no-ref-error}. Instead of usefully describing the mistake and what is
 needed to fix it, it can only tell the user that the type is wrong.
@@ -1516,7 +1516,7 @@ cost to do reference counting.
 
 In this project, I have successfully implemented a library that provides
 efficient access to BoC primitives in Rust. It invites a number of potential
-peices of follow-up work:
+pieces of follow-up work:
 
 ## Extending BoC and Boxcars
 
@@ -1535,7 +1535,7 @@ to the core BoC primitives, such as:
 While currently `verona-rt` allows creating cowns with a C++ type and using them in C++,
 and `boxcars` allows creating cowns with a Rust type and using them in Rust, there is
 no way to create a cown that can be used in both languages. It would be nice to
-allow passing cowns accross the FFI barier between these languages. This would require
+allow passing cowns across the FFI barier between these languages. This would require
 changing the current design, where the C++ side is entirely unaware of the data stored in
 a `boxcars` cown.
 
@@ -1544,7 +1544,7 @@ a `boxcars` cown.
 Currently BoC has been used for small and microbenchmarks, but these have only
 been to demonstrate the features of BoC, and the performance of various
 implementations. Either `boxcars` or `verona-rt` could be used to build a piece
-of concurrent software that actuall does something useful. With `boxcars` in paticular,
+of concurrent software that actual does something useful. With `boxcars` in particular,
 I'd be interested in finding out if the limitations on acquiring the same cown twice
 (§\ref{same-cown-twice}) actually come up in practice.
 

@@ -865,24 +865,26 @@ equivalent actions.
 
 ### Creating Cowns
 
+\begin{figure}[h]
+\includegraphics{./plot/create_cown.pdf}
+\caption{Time to create cowns}
+\label{g-create-cown}
+\end{figure}
 
-![](./bench_graphs/Create_Cowns.svg)
+The first benchmark I wrote was to create a vector of $n$ `Cown`s, and then free them. This was to measure the overhead of Rust not being able to interact directly with the `Cown` constructors, but having to do it via FFI, as discussed previously (§\ref{design-cowns}). 
 
-**Figure 1: Time to create $n$ cowns**
+As figure \ref{g-create-cown} shows, there's a roughly 7% overhead when `boxcars` creates a cown, vs when
+`verona-rt` does it.
 
-The first benchmark I wrote was to create a vector of $n$ `Cown`s, and then free them. This was to measure the overhead of Rust not being able to interact directly with the `Cown` constructors, but having to do it via FFI, as discussed previously (§\ref{design-cowns}).
 
-
-```rust
-// Rust
+```rust {.freefloat label="b-box-create-cown" caption="\texttt{boxcars} implementation of figure \ref{g-create-cown}"}
 let mut v = Vec::with_capacity(n);
 for i in 0..n {
     v.push(Cown::<usize>::new(i));
 }
 ```
 
-```c++
-// C++
+```c++ {.freefloat label="b-vrt-create-cown" caption="\texttt{verona-rt} implementation of figure \ref{g-create-cown}"}
 std::vector<cown_ptr<size_t>> v;
 v.reserve(n);
 
@@ -892,23 +894,22 @@ for (size_t i = 0; i < n; i++)
 }
 ```
 
-This overhead is measurable, but relatively small, with it only being 0.03ms when creating $2^{15}$ `Cown`s.
-
 ### Scheduling behaviours
 
-![](./bench_graphs/Schedule_Behaviours.svg)
-
-**Figure 2: Time to schedule and run $n$ behaviours** 
+\begin{figure}[h]
+\includegraphics{./plot/schedule_behaviours.pdf}
+\caption{Time to schedule behaviours}
+\label{g-sched}
+\end{figure}
 
 The other major implementation difference is how behaviours are scheduled onto
 the `Cown`s, with Rust also needing indirection over FFI (§\ref{design-behaviours}). Therefore
-I benchmarked scheduling a large number of behaviours that do minimal work, to
+I benchmarked scheduling a large number of behaviours that do minimal work (listings \ref{g-sched-rs} and \ref{g-sched-cpp}), to
 measure the cost of the scheduling and execution itself.
 
-As shown, the FFI indirection imposes very little additional overhead over the C++ code which can interact directly with the runtime.
+As shown in figure \ref{g-sched}, `boxcars` imposes very-little overhead over `verona-rt` for scheduling behaviours.
 
-```rust
-// Rust
+```rust {.freefloat label="g-sched-rs" caption="\texttt{boxcars} implementation of figure \ref{g-sched}"}
 let c = Cown::new(0);
 for _ in 0..n {
     when(&c, |mut c| {
@@ -917,83 +918,13 @@ for _ in 0..n {
 }
 ```
 
-```c++
-// C++
+```c++ {.freefloat label="g-sched-cpp" caption="\texttt{verona-rt} implementation of figure \ref{g-sched}"}
 auto c = make_cown<int>(0);
 for (int j = 0; j < n; j++)
 {
     when(c) << [](auto c) { c++; };
 }
 ```
-
-
-### Setting up scheduler
-
-```{=latex}
-\mbox{}\\
-```
-
-![](./bench_graphs/Scheduler.svg)
-
-**Figure 3: Time to create and run a scheduler doing nothing**
-
-The final thing to consider is how long it takes to set up the global scheduling
-state. Both libraries consistently take around 300μs to do so. In other
-microbenchmarks, it was important to do this outside the loop being benchmarked,
-to ensure that I was timing the code being benchmarked, and not having the
-overhead of setting up and then tearing down the executors thread and memory
-pool.
-
-```rust
-// Rust
-with_n_threads(1, || { /* no-op */ })
-```
-
-```cpp
-// C++
-Scheduler::get().init(1);
-Scheduler::get().run();
-```
-
-
-### Busy looping
-
-
-![](./bench_graphs/Busy_Loop.svg)
-
-**Figure 4: Time to busy loop for $n$ µsecs**
-
-
-To do this, I wrote a benchmark that would busy loop for a given length of time.
-This would allow me to know how long a given benchmark "should" take, and
-therefore see if this was replicated in the data.
-
-As the graph shows, it takes almost exactly $n$μs to run a behaviour that busy
-loops for $n$ μs (as expected!). As all these times are much shorter than the
-~300μs time to create the scheduler, this let me verify that my benchmarking was
-only measuring the "work" getting done, and not anything else. 
-
-```rust
-// Rust
-let c = Cown::new(usecs);
-when(&c, |c| unsafe {
-    boxcars_busy_loop(*c);
-})
-```
-
-```cpp
-// C++
-auto c = make_cown<size_t>(nsecs);    
-when(c) << [](auto c) { busy_loop(*c); };    
-```
-
-## Larger Benchmarks
-
-Performance is kind of mixed.
-
-![](./bench_graphs/savina_Banking.svg)
-![](./bench_graphs/savina_Barber.svg)
-![](./bench_graphs/Fibonacci.svg)
 
 # Evaluation of User Experience
 

@@ -160,7 +160,7 @@ local function is_minted_class(cls)
     "framesep", "funcnamehighlighting", "gobble", "highlightcolor",
     "highlightlines", "keywordcase", 
     -- Alona(2024-06-15): Remove `label`, as we add it later.
-    "label",
+    -- "label",
     "labelposition", "lastline",
     "linenos", "numberfirstline", "numbers", "mathescape", "numberblanklines",
     "numbersep", "obeytabs", "outencoding", "python3", "resetmargins",

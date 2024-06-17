@@ -195,7 +195,7 @@ out, to avoid use-after-free.
 
     This is knows as the "Rule of 5" [@cpp_core_guidelines].
 
-#### Borrowing
+#### Borrowing {#rust-borrowing}
 
 If values could only be owned and moved, than programming in Rust would be
 extremely unergonomic. As shown, all values could only be used by a function
@@ -849,19 +849,11 @@ where
 
 
 
-# Performance Evaluation.
+# Performance Evaluation
 
 One important metric to evaluate the project on is performance. As discussed previously (§\ref{design-cowns}), it's not simple to call into the C++ runtime from Rust, and I had to be somewhat indirect due to the FFI boundary. I wanted to measure the performance overhead of this, versus C++ code that can call it directly. 
 
-Note: In all benchmarks below, `Rust` indicates using my `boxcars` library, whereas `C++` indicates using the `verona-rt` library directly.
-
-All graphs were created using the excellent [`criterion`](https://github.com/bheisler/criterion.rs) (TODO: Cite?) library.
-
 ## Microbenchmarks
-
-The first way to try to understand this would be with small microbenchmarks that
-do just one thing. This would let us get a direct comparison for exactly
-equivalent actions.
 
 ### Creating Cowns
 
@@ -923,6 +915,96 @@ auto c = make_cown<int>(0);
 for (int j = 0; j < n; j++)
 {
     when(c) << [](auto c) { c++; };
+}
+```
+
+## Fibonarchi
+
+
+For a more involved benchmark, I tried a parallel evaluation of the Fibonarchi
+function. In my initial initial benchmarks, the `boxcars` code was performed
+much better. The difference was so great, I didn't think it could be caused by
+differences between `boxcars` and `verona-rt`, but instead I was somehow doing
+less work. This was indeed the case, as C++ will implicitly call the
+copy-constructor on `cown_ptr`, but Rust makes this explicit by calling
+`.clone()`. Because this extra reference-counting was made explicit, I'd avoided
+it in my inital Rust, but it happened in C++.
+
+I eneded up with 4 implementations:
+
+1. **careful boxcars**: My origional Rust implementation (listing \ref{fib-rs-careful}).
+2. **uncareful verona**: My origional C++ implementation, that does unnessessary refernce-counting (listing \ref{fib-cpp-uncareful}).
+3. **careful verona**: A C++ implementation that avoids unnessesary reference-counting (listing \ref{fib-cpp-careful}).
+4. **uncareful boxcars**: A Rust implementation that adds the unnessesary reference-counting from 2 (listing \ref{fib-rust-uncareful}).
+
+\begin{figure}[h]
+\includegraphics{./plot/fibonacci.pdf}
+\caption{Time to calculate $fib(n)$}
+\label{g-fib}
+\end{figure}
+
+The performance of these is compared in figure \ref{g-fib}. Both the careful
+implementations have almost exactly the same performance, while both the
+uncareful ones do significatly worse.
+
+```rust {.freefloat caption="Implementation of `careful boxcars' from figure \ref{g-fib}" label="fib-rs-careful"}
+fn par_fib_careful(n: u32, result: &Cown<u32>) {
+    if n <= 4 {
+        when(result, move |mut r| *r = sequential_fib(n));
+    } else {
+        let f1 = Cown::new(0);
+        par_fib_careful(n - 1, &f1);
+        par_fib_careful(n - 2, result);
+        when((result, &f1), |(mut r, f)| *r += *f);
+    }
+}
+```
+
+
+```c++ {.freefloat caption="Implementation of `uncareful verona-rt' from figure \ref{g-fib}" label="fib-cpp-uncareful"}
+  void par_fib_uncareful(uint32_t n, cown_ptr<uint32_t> result)
+  {
+    if (n <= 4)
+    {
+      when(result) << [n](auto r) { *r = sequential_fib(n); };
+    }
+    else
+    {
+      auto f1 = make_cown<uint32_t>(0);
+      par_fib_uncareful(n - 1, f1);
+      par_fib_uncareful(n - 2, result);
+      when(result, f1) << [](auto r, auto f) { *r += f; };
+    }
+  }
+```
+
+```c++ {.freefloat caption="Implementation of `careful verona-rt' from figure \ref{g-fib}" label="fib-cpp-careful"}
+  void par_fib_careful(uint32_t n, cown_ptr<uint32_t>& result)
+  {
+    if (n <= 4)
+    {
+      when(result) << [n](auto r) { *r = sequential_fib(n); };
+    }
+    else
+    {
+      auto f1 = make_cown<uint32_t>(0);
+      par_fib_careful(n - 1, f1);
+      par_fib_careful(n - 2, result);
+      when(result, f1) << [](auto r, auto f) { *r += f; };
+    }
+  }
+```
+
+```rust {.freefloat caption="Implementation of `uncareful boxcars' from figure \ref{g-fib}" label="fib-rust-uncareful"}
+fn par_fib_uncareful(n: u32, result: Cown<u32>) {
+    if n <= 4 {
+        when(&result, move |mut r| *r = sequential_fib(n));
+    } else {
+        let f1 = Cown::new(0);
+        par_fib_uncareful(n - 1, f1.clone());
+        par_fib_uncareful(n - 2, result.clone());
+        when((&result, &f1), |(mut r, f)| *r += *f);
+    }
 }
 ```
 
@@ -1078,6 +1160,40 @@ when((a, b), |(a, b)| {
 });
 ```
 
+## Acquiring the Same Cown Twice {#same-cown-twice}
+
+It Rust, it's undefined behaviour to have aliasing mutable references [@nomicon, @rust_book, @rustbelt].
+Normally this is checked by the borrow checker (\ref{rust-borrowing}), but when using `unsafe` as `boxcars` does,
+that code must ensure this in maintained.
+
+However, when acquiring cowns, you could acquire the same cown twice, and then use those
+to obtain overlapping references, as shown in \ref{twocown-ub}. While this is fine in BoC
+itself and doesn't violate any of it's invariants or cause data-races for it, it's immediate 
+undefined-behaviour in Rust.
+
+<!-- TODO: Link to acq_cown creation discussion -->
+
+To avoid this, `boxcars` will panic [^panic] when attempting to schdule a
+behaviour onto the same cown twice. The output of this is shown is
+\ref{twocown-ub-output}.
+
+[^panic]: To panic in Rust is to throw a non-recoverable error. It's like aborting, but with a bit more
+    debuging machinery around it.
+
+```rust {.freefloat caption="Attempting to acquire the same cown twice, to obtain aliasing mutable references" label="twocown-ub"}
+let c = Cown::new(10);
+when((&c, &c), |(c1, c2)| {
+    let ptr_1: &mut i32 = c1.deref_mut();
+    let ptr_2: &mut i32 = c2.deref_mut();
+    // aliasing mutable references, UB!!
+});
+```
+
+```text {.freefloat caption="Output of running listing \ref{twocown-ub}" label="twocown-ub-output"}
+thread 'main' panicked at crates/boxcars/src/when.rs:80:1:
+Cowns not unique
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
 
 ## Compiler Errors
 
@@ -1115,7 +1231,7 @@ auto c_foo = make_cown<Foo>("hello", 101);
 ```
 
 
-```text {.wraparound caption="\captionerr{cpp-wrong-ctor}" label="cpp-wrong-ctor-err"}
+```text {.breaklines caption="\captionerr{cpp-wrong-ctor}" label="cpp-wrong-ctor-err"}
 In file included from verona-rt/src/rt/./cpp/when.h:6,
                  from cpp/playground.cc:1:
 verona-rt/src/rt/./cpp/cown.h: In instantiation of ‘verona::cpp::ActualCown<T>::ActualCown(Args&& ...) [with Args = {const char (&)[6], int}; T = Foo]’:
@@ -1238,18 +1354,25 @@ note: required by a bound in `when`
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `when`
 ```
 
-### Rustc being helpful and unhelpfull
+### Not Using a Tuple for When Lambda Arguments
 
-```rust
+This error's not applicable to `verona-rt`, but in boxcars
+
+When acquiring multiple cowns, the argument to the lambda is a tuple of all the
+acquired cowns. However sometimes I typo'd (or forgot) this, and wrote out the
+arguments expecting to get all the cowns in different arguments, as shown in
+listing \ref{non-tup-args}. Fortunatly, because `rustc` knows exactly what type
+is expected at the call sight, it's able to produce a really great error
+(listing \ref{non-tup-args-err}) that suggests how to fix this mistake.
+
+```rust {.freefloat caption="\texttt{boxars} code that" label="non-tup-args"}
 let foo = Cown::new(101);
 let bar = Cown::new(202);
 
 when((&foo, &bar), |foo, bar| {});
 ```
 
-gives:
-
-```
+```text {.freefloat .breaklines caption="\captionerr{non-tup-args}" label="non-tup-args-err"}
 error[E0593]: closure is expected to take a single 2-tuple as argument, but it takes 2 distinct arguments
   --> crates/verona-rt/examples/err.rs:22:5
    |
@@ -1337,7 +1460,7 @@ can't say what type it needs to be, only that it must implement a certain trait.
 This also causes a followup error, where it claims that the function has the
 wrong signature, because it can't find the correct one.
 
-## auto-copy vs explicit clone.
+## auto-copy vs explicit clone {#cpp-autoclone}
 
 In C++, the `cown_ptr` class overloads it's copy and assignment constructor to automatically update the reference count:
 
@@ -1386,7 +1509,38 @@ cost to do reference counting.
 
 # Future Works
 
-- Large scale software in BoC
-- Passing datatypes between C++ and Rust.
+In this project, I have successfully implemented a library that provides
+efficient access to BoC primitives in Rust. It invites a number of potential
+peices of follow-up work:
+
+## Extending BoC and Boxcars
+
+While `boxcars` implements all the behaviour described in the paper introducing BoC
+[@when_concurrency_matters], `verona-rt` is currently developing a number of extensions
+to the core BoC primitives, such as:
+
+1. Atomic scheduling of multiple behaviours 
+2. Read only acquired cowns, that allow
+3. Notifications
+
+`boxcars` could be extended to also support these additional features. This
+
+## Passing Cowns between Rust and C++
+
+While currently `verona-rt` allows creating cowns with a C++ type and using them in C++,
+and `boxcars` allows creating cowns with a Rust type and using them in Rust, there is
+no way to create a cown that can be used in both languages. It would be nice to
+allow passing cowns accross the FFI barier between these languages. This would require
+changing the current design, where the C++ side is entirely unaware of the data stored in
+a `boxcars` cown.
+
+## Developing medium-scale software in BoC
+
+Currently BoC has been used for small and microbenchmarks, but these have only
+been to demonstrate the features of BoC, and the performance of various
+implementations. Either `boxcars` or `verona-rt` could be used to build a piece
+of concurrent software that actuall does something useful. With `boxcars` in paticular,
+I'd be interested in finding out if the limitations on acquiring the same cown twice
+(§\ref{same-cown-twice}) actually come up in practice.
 
 # References

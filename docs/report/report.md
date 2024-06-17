@@ -555,12 +555,32 @@ only accessible inside behaviours that have acquired that cown.
 The `boxcars` library implements BoC cowns and behaviours on top of the
 `verona-rt` runtime.
 
-A significant challenge is that Rust code can't call C++ functions directly,
-only C ones.
+```rust {caption="A simple example of using boxcars"}
+let c1 = Cown::new("hello");
+let c2 = Cown::new("world");
+
+let n = 10;
+
+when((&c1, &c2), |(c1, c2)| {
+    println!("{c1} {c2}!");
+    println!("n = {}", n);
+});
+```
+
+It has 3 main parts to it's public API.
+
+- `Cown`, which represents an unacquired cown
+- `when`, which schedules a lambda onto a collection of cowns.
+- `AcquiredCown`, which is passed to the lambda, and gives access to the cowns data.
+
 
 <!-- TODOX: Something about monomorphization that these OS people will understand. -->
 
 <!-- TODOX: Show off the library here. -->
+
+A significant challenge is that Rust code can't call C++ functions directly,
+only C ones.
+
 
 ## Cowns {#design-cowns}
 

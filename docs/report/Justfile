@@ -16,5 +16,5 @@ clean:
     rm -rf ./svg-inkscape
 
 longbench:
-    cargo bench -p verona-rt --bench micro -- --test
-    cargo bench -p verona-rt --bench micro -- --measurement-time 200 --discard-baseline
+    cargo bench -p boxcars --bench micro -- --test
+    cargo bench -p boxcars --bench micro -- --measurement-time 200 --discard-baseline

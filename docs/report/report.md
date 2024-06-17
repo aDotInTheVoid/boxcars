@@ -1116,7 +1116,7 @@ can we borrow the individual field that we want. At the time of the
 `deref_mut` call, we have borrowed _all_ of `acq_cown`. Whereas in listing
 \ref{partial-works}, we never borrow all of `foo`, only its individual fields.
 
-```text {.freefloat caption="\captionerr{autoderef-desugared}" label="autoderef-desugared-err"}
+```text {.freefloat .breaklines caption="\captionerr{autoderef-desugared}" label="autoderef-desugared-err"}
 error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
   --> tests/ui/partial-borrow.rs:30:65
    |
@@ -1388,18 +1388,29 @@ help: change the closure to accept a tuple instead of individual arguments
    |  
 ```
 
-However, not all cases can be caught, and you definitely can still get unhelpfull error messages:
+### Passing Wrong Arguments as Cowns
 
-```rust
+However there are some cases where `boxcars` can cause a quite unhelpful error
+to be emited. For example, listing \ref{no-ref} passes a tuple of cowns, instead
+of a tuple of references to cowns. This causes the error given in listing
+\ref{no-ref-error}. Instead of usefully describing the mistake and what is
+needed to fix it, it can only tell the user that the type is wrong.
+
+```rust {caption="Not passing cowns by reference to \texttt{when}" label="no-ref"}
 let foo = Cown::new(101);
 let bar = Cown::new(202);
 
 when((foo, bar), |(foo, bar)| {});
 ```
 
-Which produces:
+The root of the problem is that you need to borrow these `Cown`s to form a
+`CownCollection`. However, because `when`'s first argument is generic, `rustc`
+can't say what type it needs to be, only that it must implement a certain trait.
+This also causes a followup error, where it claims that the function has the
+wrong signature, because it can't find the correct one.
 
-```
+
+```text {.breaklines .freefloat caption="\captionerr{no-ref}" label="no-ref-error"}
 error[E0277]: the trait bound `(Cown<{integer}>, Cown<{integer}>): CownCollection` is not satisfied
   --> crates/verona-rt/examples/err.rs:22:10
    |
@@ -1453,12 +1464,6 @@ note: required by a bound in `when`
 14 |     F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `when`
 ```
-
-The root of the problem is that you need to borrow these `Cown`s to form a
-`CownCollection`. However, because `when`'s first argument is generic, `rustc`
-can't say what type it needs to be, only that it must implement a certain trait.
-This also causes a followup error, where it claims that the function has the
-wrong signature, because it can't find the correct one.
 
 ## auto-copy vs explicit clone {#cpp-autoclone}
 

@@ -547,11 +547,11 @@ extern "C"
   }
 
   void boxcars_sched_lambda(
-    size_t n_cowns,
-    Cown** cowns,
     void (*f)(Work*),
-    size_t payload_size,
-    void* payload)
+    Cown** cowns,
+    size_t n_cowns,
+    void* payload,
+    size_t payload_size)
   {
     /* static Behaviour* make(size_t count, T&& f) */
     auto* behaviour_core = BehaviourCore::make(n_cowns, f, payload_size);

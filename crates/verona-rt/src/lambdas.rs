@@ -7,10 +7,9 @@ where
     // TODO: Is this the right bound?
     F: FnOnce(&[ffi::Slot]) + Send + 'static,
 {
-    // TODO: Use inline-const here.
-    // const {
-    assert!(mem::align_of::<F>() <= mem::align_of::<*mut ()>());
-    // }
+    const {
+        assert!(mem::align_of::<F>() <= mem::align_of::<*mut ()>());
+    }
 
     let func_nodrop = mem::ManuallyDrop::new(func);
 
@@ -18,11 +17,11 @@ where
 
     unsafe {
         ffi::boxcars_sched_lambda(
-            cowns.len(),
-            cowns.as_ptr(),
             invoke,
-            mem::size_of::<F>(),
+            cowns.as_ptr(),
+            cowns.len(),
             &func_nodrop as *const _ as _,
+            mem::size_of::<F>(),
         )
     }
 }

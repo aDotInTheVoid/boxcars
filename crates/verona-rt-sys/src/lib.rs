@@ -111,11 +111,13 @@ extern "C" {
     pub fn boxcars_dump_flight_recorder();
 
     pub fn boxcars_sched_lambda(
-        n_cowns: usize,
-        cowns: *const CownPtr,
         f: extern "C" fn(WorkPtr),
-        payload_size: usize,
+
+        cowns: *const CownPtr,
+        n_cowns: usize,
+
         payload: *const (),
+        payload_size: usize,
     );
     pub fn boxcars_preinvoke(
         work: WorkPtr,

@@ -21,6 +21,10 @@ header-includes: |
   ```
 ---
 
+<!-- 
+TODO: 
+- s/lambda/closure/g
+ -->
 
 ```{=latex}
 \input{title.tex}
@@ -82,28 +86,7 @@ earlier draft of this report. All remaining errors are mine.
 }
 ```
 
-# Introduction
-
-Help!!!
-
-```cpp {caption="Foo Code" label="code:foo"}
-int main() {
-    std::cout << "Lol";
-}
-```
-
-```java {caption="Bar Code" label="code:bar"}
-class Bar {}
-```
-
-Foo = \ref{code:foo}. Bar = \ref{code:bar}.
-
-
-## Why
-
-
-
-## How?
+<!-- TOOD: Introduction??? -->
 
 # Background
 
@@ -583,6 +566,8 @@ A significant challenge is that Rust code can't call C++ functions directly,
 only C ones.
 <!-- TODO: Something about monomorphization that these OS people will understand. -->
 
+<!-- TODO: Show off the library here. -->
+
 ## Cowns {#design-cowns}
 
 The first thing we need to do is have a `Cown` type that represents some data. 
@@ -784,9 +769,84 @@ cown's allocation is freed.
 
 ## Behaviours {#design-behaviours}
 
-## Behaviour API
+### On-Heap Layout
 
-## Scheduler
+A behaviour is represented as a single heap allocation, as shown in figure \ref{boxcars-behaviour-diagram}.
+This contains mainy things.
+
+1. `verona::rt::Work`. This contains some scheduling state, as well as a function pointer (`void (*f)(Work*)`) to be invoked
+    when the behaviour is scheduled.
+2. `verona::rt::BehaviourCore`. This contains more scheduling state [^why_work_and_behaviourcore], as well as the number of slots.
+3. Array of `verona::rt::Slot`/`boxcars::Slot`. These contain the `Cown`s that
+   the behaviour must acquire before being executed. Unlike `Work` and `BehaviourCore`, the Rust side of `boxcars` knows
+   the layout of these structs, so it can read the cowns from them. <!-- TODO: This could be explained more. -->
+4. `impl FnOnce(&[Slot])`. This is called the "payload", and is completely opaque to `verona-rt`. It is read by the function pointer
+    inside the `Work`, and used to store the closure captures.
+
+```{=latex}
+\begin{figure}[h]
+\includegraphics[width=8cm]{./img/behaviour-layout.png}
+\caption{In-memory layout of a behaviour in \texttt{boxcars}}
+\label{boxcars-behaviour-diagram}
+\end{figure}
+```
+
+[^why_work_and_behaviourcore]: This begs the question: Why are `Work` and
+    `BehaviourCore` seperate? `verona-rt` wants to explore scheduling things
+    that arn't behaviours, and uses this as a common abstraction.
+
+To create a behaviour, the low-level function is `boxcars_sched_lambda`, whose
+type signature is given in listing \ref{boxcars-sched-lambda}.
+In creates a behaviour structure (shown in figure \ref{boxcars-behaviour-diagram}), that contains `n_cowns` cowns copied from
+`cowns`[^not_slice], `payload_size` bytes of payload copied from payload, and `f` as the pointer that will be invoked when all cowns are acquired.
+
+[^not_slice]: We can't use a slice of cowns (`&[CownPtr]`) here, because Rust
+    slices don't have a well-defined ABI. Instead we decompose it into its raw parts (a pointer and a lenght), and pass those individually.
+
+```rust {caption="Rust-side declaration of \texttt{boxcars\\_sched\\_lambda}" label="boxcars-sched-lambda"}
+extern "C" {
+    fn boxcars_sched_lambda(
+        f: extern "C" fn(WorkPtr),
+
+        cowns: *const CownPtr,
+        n_cowns: usize,
+
+        payload: *const (),
+        payload_size: usize,
+    );
+}
+```
+
+<!-- TODO: It's be really convenient if we'd explained how rust's lambda's.
+alas.
+ -->
+
+### Invocation Trampoline
+
+The function passed as `f` here can't be the users closure they passed to `when`, as that expects to recieve `AcquiredCown`s. Instead, always use the `invoke_trampoline` (listing \ref{invoke-tramp-sig}) function. It's instanciated with a different `F` for each different closure. How it works is
+
+```rust {label="invoke-tramp-sig" caption="Signature of \texttt{invoke\\_trampoline}"}
+extern "C" fn invoke_trampoline<F>(work: WorkPtr)
+where
+    F: FnOnce(&[Slot])
+```
+
+1. Taking the pointer to `Work` (as the other data stored after it, see figure \ref{boxcars-behaviour-diagram}), as using that to find
+    - The pointer to the start of the slots array
+    - The lenght of the slots array
+    - The pointer to the start of the payload, where the closure's captures are stored.
+2. Invoke the closure.
+
+    Importantly, the closure isn't called via a function pointer. The payload
+    pointer is only used to pass the closure's captures, but the definition itself is passed via the generic argument `F`, and therefor the call is direct (and likely to be inlined) due to monomophization.
+3. Free associated resources. This involves:
+
+    - Releasing the acquired cowns, so they can be acquired by the next behaviour that's scheduled onto them
+    - Running the destructor on the closure's captures (if applicable).
+    - Freeing the heap allocation that contains the behaviour.
+
+### User-Facing Type-Safe API
+
 
 
 # Performance Evaluation.
@@ -900,12 +960,6 @@ Scheduler::get().run();
 
 
 ![](./bench_graphs/Busy_Loop.svg)
-
-
-```{=latex}
-\mbox{}\\
-```
-
 
 **Figure 4: Time to busy loop for $n$ µsecs**
 
@@ -1022,8 +1076,6 @@ error[E0499]: cannot borrow `acq_cown` as mutable more than once at a time
   |   |             |
   |   |             first mutable borrow occurs here
   |   first borrow later used by call
-
-For more information about this error, try `rustc --explain E0499`.
 ```
 
 This occurs because the compiler inserts calls to the the `deref_mut` method,
@@ -1098,17 +1150,25 @@ when((a, b), |(a, b)| {
 
 ## Compiler Errors
 
-Because Rust checks generics at the call site, rather than using template
-expansion, is can often produce much nicer error messages than the equivalent
-from C++.
+Both `verona-rt` and `boxcars` are make extensive use of the type-system to
+ensure users code is correct. This means that when a user makes a mistake, this
+is often communicated to them in the form of a type error. In general, Rust (and
+`boxcars` by extension) is able to produces beter type errors because it checks
+generics as soon as they're called, rather than instantiating templates and then
+checking them.
 
-(Note: comparing `g++ 13.2.0` to `rustc 1.78.0`)
+Note: Compiller errors are from `g++ 13.2.0` and `rustc 1.79.0`. They will be
+slightly different on different versions.
 
-### Wrong Cown constructor.
+### Wrong Cown Constructor Arguments
 
-The most frequently encountered one of these when writing the benchmarks was getting 
+The most frequent type error I ran into when writing the benchmarks was getting
+the wrong arguments to a constructor wrong. When the same mistake is made in
+both C++ (listing \ref{cpp-wrong-ctor}) and Rust (\ref{rust-wrong-ctor}), they
+both produce a compiller error (listings \ref{cpp-wrong-ctor-err} and
+\ref{rust-wrong-ctor-err} respectively).
 
-```c++
+```c++ {caption="Calling a constructor with the wrong arguments with \texttt{verona\\_rt}" label="cpp-wrong-ctor"}
 class Foo
 {
   int number_;
@@ -1118,12 +1178,13 @@ public:
   Foo(int number, const char* str) : number_(number), str_(str) {}
 };
 
-// These are the wrong way round
+//                          These are the wrong way round
+//                          vvvvvvvvvvvv
 auto c_foo = make_cown<Foo>("hello", 101);
 ```
 
 
-```
+```text {.wraparound caption="\captionerr{cpp-wrong-ctor}" label="cpp-wrong-ctor-err"}
 In file included from verona-rt/src/rt/./cpp/when.h:6,
                  from cpp/playground.cc:1:
 verona-rt/src/rt/./cpp/cown.h: In instantiation of ‘verona::cpp::ActualCown<T>::ActualCown(Args&& ...) [with Args = {const char (&)[6], int}; T = Foo]’:
@@ -1147,9 +1208,7 @@ cpp/playground.cc:21:31: note:   initializing argument 2 of ‘Foo::Foo(int, con
       | 
 ```
 
-Whereas in Rust if you make the same mistake:
-
-```rust
+```rust {label="rust-wrong-ctor" caption="Calling a constructor with the wrong arguments in \texttt{boxcars}"}
 struct Foo {
     number: i32,
     string: &'static str,
@@ -1161,12 +1220,12 @@ impl Foo {
     }
 }
 
+//                             These are the wrong way round
+//                             vvvvvvvvvvvv
 let c_foo = Cown::new(Foo::new("hello", 101));
 ```
 
-You instead get:
-
-```
+```text {caption="\captionerr{rust-wrong-ctor}" label="rust-wrong-ctor-err"}
 error[E0308]: arguments to this function are incorrect
   --> crates/verona-rt/examples/err.rs:15:27
    |
@@ -1184,25 +1243,22 @@ help: swap these arguments
    |
 15 |     let c_foo = Cown::new(Foo::new(101, "hello"));
    |                                   ~~~~~~~~~~~~~~
-
-For more information about this error, try `rustc --explain E0308`.
 ```
 
-Which is much more understandable, as it doesn't need to take a detour through the templated library code.
-<!-- TODO: More here about not needing std::forward -->
+### Wrong When Lambda Argument Type
 
-### Wrong Args
+Another mistake, though less frequent, was expecting to get an acquired cown with a different type to the one being acquired.
+When this in done in C++ (listing \ref{cpp-wrong-acq}), it causes the compiller to spew out the internal of the `when` implementation
+(\ref{cpp-wrong-acq-err})
 
-Another case to consider is getting the arguments to the behaviour wrong.
-
-```c++
+```c++ {.freefloat label="cpp-wrong-acq" caption="Giving the wrong type for \texttt{acquired\\_cown} in \texttt{verona\\_rt}"}
 auto a = make_cown<uint32_t>(101);
+// `a` should be of type `acquired_cown<uint32_t>`, not `acquired_cown<bool>`
+//            vvvvvvvvvvvvvvvvvvv
 when(a) << [](acquired_cown<bool> a) {};
 ```
 
-This causes C++ compilers to spew out the internals of the `when` implementation, because the type signature isn't part of then `when` function:
-
-```
+```text {.freefloat label="cpp-wrong-acq-err" caption="\captionerr{cpp-wrong-acq}"}
 In file included from cpp/playground.cc:1:
 verona-rt/src/rt/./cpp/when.h: In instantiation of ‘auto verona::cpp::When<F, Args>::to_tuple() [with F = real_main()::<lambda(verona::cpp::acquired_cown<bool>)>; Args = {verona::cpp::Access<unsigned int>}]’:
 verona-rt/src/rt/./cpp/when.h:181:28:   required from ‘void verona::cpp::Batch<Args>::create_behaviour(verona::rt::BehaviourCore**) [with long unsigned int index = 0; Args = {verona::cpp::When<real_main()::<lambda(verona::cpp::acquired_cown<bool>)>, verona::cpp::Access<unsigned int> >}]’
@@ -1220,14 +1276,14 @@ cpp/playground.cc:19:14: note: candidate: ‘real_main()::<lambda(verona::cpp::a
 cpp/playground.cc:19:14: note:   no known conversion for argument 1 from ‘acquired_cown<unsigned int>’ to ‘acquired_cown<bool>’
 ```
 
-Rust
+Whereas when this same mistake is made in Rust (listing \ref{rust-wrong-acq}), the error 
 
-```rust
+```rust {label="rust-wrong-acq" caption="Giving the wrong type for \texttt{AcquiredCown} in \texttt{boxcars}"}
 let a = Cown::<u32>::new(101);
+
+// `a` shoud be of type `AcquiredCown<u32>`, not `AcquiredCown<bool>`
 when(&a, |a: AcquiredCown<bool>| {});
 ```
-
-which gives:
 
 ```
 error[E0631]: type mismatch in closure arguments
@@ -1249,8 +1305,6 @@ note: required by a bound in `when`
 ...
 14 |     F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `when`
-
-For more information about this error, try `rustc --explain E0631`.
 ```
 
 ### Rustc being helpful and unhelpfull
@@ -1344,8 +1398,6 @@ note: required by a bound in `when`
 ...
 14 |     F: for<'a> FnOnce(C::Acquired<'a>) + Send + 'static,
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `when`
-
-For more information about this error, try `rustc --explain E0277`.
 ```
 
 The root of the problem is that you need to borrow these `Cown`s to form a

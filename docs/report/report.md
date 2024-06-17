@@ -21,10 +21,6 @@ header-includes: |
   ```
 ---
 
-<!-- 
-TODO: 
-- s/lambda/closure/g
- -->
 
 ```{=latex}
 \input{title.tex}
@@ -45,10 +41,11 @@ This project introduces the **`boxcars`** library, which implements
 behaviour-oriented concurrency in Rust. It provides an idiomatic and type-safe
 wrapper over the runtime from `verona-rt`.
 
-We demonstrate that the `boxcars` API enforces the gaurenttes of
-behaviour-oriented concurrency in ways that `verona-rt` is unable to. We also
-demonstrate that using `boxcars` (instead of Rust's included `std::sync`
-library) allows writing concurrent code that is deadlock-free by construction.
+The `boxcars` API enforces the gaurenttes of behaviour-oriented concurrency in
+ways that `verona-rt` is unable to. Using `boxcars`(instead of Rust's included
+`std::sync` library) also allows writing concurrent rust code that is
+deadlock-free by construction.
+
 Furthermore, we demonstrate that it imposes minimal overhead over using
 `verona-rt` directly.
 
@@ -380,6 +377,10 @@ when(myCown) {
 myCown += 10; // invalid.
 ```
 
+Inside the block for the `when`, a user can access the data inside a cown.
+However, outside then `when`, when that cown hasn't been acquired, it's invalid
+to access it.
+
 <!-- TODO: What's my point here. -->
 
 BoC is both *data-race free* and *deadlock free*. No data races can occur, as
@@ -400,18 +401,6 @@ It exposes both a the `verona::cpp` API, which uses templates to expose a typed
 C++ api for cowns and behaviours, as well as the lower level `verona::rt` API,
 which is used to implement `verona::cpp`, but can also be used in it's own
 right. 
-
-<!-- TODO: Discuss verona::rt
-- Cown*
-- Descriptors
-- BehaviourCore
- -->
-
-### `veronna::rt` API
-
-#### `Cown`
-
-#### `Descriptor`
 
 ### `verona::cpp` API
 
@@ -545,17 +534,21 @@ be used, and the `acquired_cown` class must give out pointers/references to
 allow access to the underlying data.
 
 Rust can solve this with the power of lifetimes.
-<!-- TODO: Is this line a good idea? -->
+<!-- TODOX(link to where). -->
 
-<!--
-### Other concurrency paradise
 
-- Shared Memory
-- Message Passing
-- Fork/Join
-- Actors
-- Structured Concurrency
--->
+### `veronna::rt` API
+
+`verona::rt` is a lower-level API that is used to implement the `verona::cpp`
+API. While it still has Cowns, they arn't typed at all. It instead just exposes
+the `verona::rt::Cown` type. Higher level API's can use it's implementation of
+reference-counting and scheduling, but they themselves are responcible for
+calling `verona::rt::Cown`s methods to change the reference-count, and schedule.
+
+Additionally, `verona::rt::Cown` doesn't encode any information about the data
+it contains. Higher level users are responcible for placing this alongside the
+`verona::rt::Cown` (ideally in the same allocation), and then making this data
+only accessable inside behaviours that have acquired that cown.
 
 # Design and Implementation of a Rust Library for Behaviour-Oriented Concurrency
 
@@ -564,9 +557,10 @@ The `boxcars` library implements BoC cowns and behaviours on top of the
 
 A significant challenge is that Rust code can't call C++ functions directly,
 only C ones.
-<!-- TODO: Something about monomorphization that these OS people will understand. -->
 
-<!-- TODO: Show off the library here. -->
+<!-- TODOX: Something about monomorphization that these OS people will understand. -->
+
+<!-- TODOX: Show off the library here. -->
 
 ## Cowns {#design-cowns}
 
@@ -708,8 +702,6 @@ extern "C"
 The remaining operations are creating a new `Cown`, and running the destructor
 on the underlying data once the reference-count reaches zero. It turns out these
 are closely related.
-
-<!-- TODO: Link to background::verona_rt::rt::descriptor if that get's written. -->
 
 The core problem when creating a `Cown` was that the `verona::rt::Cown` could
 only be created from C++, but C++ couldn't know about the `T` in a
@@ -1171,7 +1163,7 @@ to obtain overlapping references, as shown in \ref{twocown-ub}. While this is fi
 itself and doesn't violate any of it's invariants or cause data-races for it, it's immediate 
 undefined-behaviour in Rust.
 
-<!-- TODO: Link to acq_cown creation discussion -->
+<!-- TODOX: Link to acq_cown creation discussion -->
 
 To avoid this, `boxcars` will panic [^panic] when attempting to schedule a
 behaviour onto the same cown twice. The output of this is shown is

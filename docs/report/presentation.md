@@ -375,10 +375,23 @@ fn borrow_from_stack() {
     let my_vec = vec![1, 2, 3];
     let idx = Cown::new(1);
     when(&idx, move |idx| {
-        dbg!(my_vec[*idx]); // [examples/playground.rs:7:9] my_vec[*idx] = 2
+        // [examples/playground.rs:7:9] my_vec[*idx] = 2
+        dbg!(my_vec[*idx]);
     });
 }
 ```
+
+## Error Prevented: Capturing Twice
+
+```rust
+let my_vec = vec![1, 2, 3];
+let idx_1 = Cown::new(1);
+let idx_2 = Cown::new(2);
+when(&idx_1, move |idx_1| { dbg!(my_vec[*idx_1]); });
+when(&idx_2, move |idx_2| { dbg!(my_vec[*idx_2]); });
+```
+
+![](./img/error4.png)
 
 
 ## Boxcars: C++ FFI

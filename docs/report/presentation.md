@@ -252,7 +252,7 @@ dbg!(add_x(3)); // [src/main.rs:8:5] add_x(3) = 13
 
 ```rust
 struct _AddXClosure {
-    captured_x: i32,
+    captured_x: i32, // no function-pointer!
 }
 
 impl core::ops::Fn<(i32,)> for _AddXClosure {
@@ -509,7 +509,7 @@ void boxcars_sched_lambda(
 
 ## Behaviour: Layout
 
-![](img/behaviour-layout(4).png)
+![](img/behaviour-layout(4).png){ height=90% }
 
 ## Behaviour: Execution
 
@@ -520,7 +520,9 @@ void boxcars_sched_lambda(
 4. Rust trampoline invokes underlying closure
 5. C++ makes closures available, and free's allocation
 
-Rust knows only how `Slot`s are laid out, but not how `BehaviourCore` or `Work` are.
+Rust side knows only how `Slot`s are laid out, but not how `BehaviourCore` or `Work` are.
+
+C++ side knows nothing about the Rust side.
 
 # Benchmarks
 

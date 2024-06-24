@@ -15,6 +15,11 @@ clean:
     rm -rf ./dist
     rm -rf ./svg-inkscape
 
+# Build presentation pdf
+pres:
+    mkdir -p dist
+    pandoc ./presentation.md -o ./pres.pdf -t beamer
+
 longbench:
     cargo bench -p boxcars --bench micro -- --test
     cargo bench -p boxcars --bench micro -- --measurement-time 200 --discard-baseline

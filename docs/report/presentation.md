@@ -57,25 +57,89 @@ when (a, b) {
 }
 ```
 
-A behaviour $b_1$ is gaurenteed to be executed before $b_2$ if and only if $b_1$ and $b_2$ acquire overlapping cowns and
+A behaviour $b_1$ is guaranteed to be executed before $b_2$ if and only if $b_1$ and $b_2$ acquire overlapping cowns and
 $b_1$ was spawned before $b_2$.
 
-## BoC: Gaurentees
+## BoC: Guarantees
 
 - datarace-free!
+    - behaviours are only way to execute code in parallel
     - all shared state is in cowns
-    - executing behaviours have
-    - behaviours 
+    - behaviours ensure unique access to cowns before executing
 - deadlock-free!
-    - 
-
+    - only "blocking" operation is acquiring cowns when spawning behaviour
+    - but this lets next statement execute
+    - all cowns acquired at once, avoids lock-inversion
 
 ## What BoC needs from a host language
 
-BoC 
+BoC can be implemented as an library/extension to existing languages.
+
+However, to get datarace and deadlock freedom, host languages must:
 
 - Ensure cown's data isn't reachable by other means
-- Ensure behaviours 
+- Ensure behaviours only access shared data via cowns
+
+
+# Background: `verona-rt`
+
+## `verona-rt`
+
+- C++ implementation of BoC
+- 2 API's:
+    - `verona::rt`,
+    - `verona::cpp`, a C++ DSL to write BoC code in C++
+
+## Using `verona-rt::cpp`
+
+```c++
+using namespace verona::cpp;
+
+cown_ptr<std::string> cown = make_cown<std::string>("hello");
+
+when(cown) << [](acquired_cown<std::sting> cown) {
+    cown->push_back('!');
+    std::cout << *cown << '\n';
+};
+```
+
+Type system used to model BoC
+
+- `cown_ptr<T>`: Forbids access
+- `acqured_cown<T>`: Allows access
+
+## Accessing Cown's Data Outside of Behaviour
+
+```c++
+cown_ptr<int> my_cown = make_cown<int>(10);
+int* escape_data;
+when(my_cown) << [&escape_data](acquired_cown<int> my_cown) {
+    escape_data = &*my_cown;
+};
+sleep(3); // Wait for behaviour to run
+*escape_data += 10; // Modifies cown without acquiring!!!
+```
+
+## Accessing Shared Data in Behaviours 
+
+```cpp
+std::vector<int> my_vec{};
+auto cown1 = make_cown<int>(42);
+auto cown2 = make_cown<int>(12);
+
+when(cown1) << [&my_vec](auto cown1) {
+    my_vec.push_back(*cown1);
+};
+
+when(cown2) << [&my_vec](auto cown2) {
+    my_vec.push_back(*cown2);
+};
+
+when(cown1, cown2) << [&my_vec](auto cown1, auto cown2) {
+    for (int& i : my_vec)
+        std::cout << i << "\n";
+};
+```
 
 # Background: Rust
 
@@ -89,7 +153,7 @@ BoC
 ## Rust: Ownership
 
 1. Each value in Rust has an owner.
-2. There can only be one owner at a time for a value, but it can be transfered between owners.
+2. There can only be one owner at a time for a value, but it can be transferred between owners.
 3. When the owner goes out of scope, the value is dropped
 
 ## Rust: Borrowing
@@ -98,7 +162,7 @@ Values can be borrowed in 2 way:
 
 1. Mutable/exclusive reference:
    - `&mut i32`
-   - Can only be 1 mutable referece to a value at a time.
+   - Can only be 1 mutable reference to a value at a time.
    - Allows mutation.
 2. Immutable/shared reference:
     - `&i32`
@@ -107,7 +171,7 @@ Values can be borrowed in 2 way:
 
 More succinctly, references allow **Aliasing XOR Mutation**.
 
-Enforced by a part of the compiller called the **Borrow Checker**.
+Enforced by a part of the compiler called the **Borrow Checker**.
 
 
 ## Rust: Lifetimes
@@ -136,25 +200,45 @@ fn select_ref<'a>(which: bool, when: &'a i32, unless: &'a i32) -> &'a i32 {
 }
 ```
 
-## Rust: `std::sync::Mutex`
+## Rust: `Mutex` API
 
 ```rust
-struct Mutex<T> { /* private fields */ }
-
+pub struct Mutex<T> { ... }
+pub struct MutexGuard<'a, T: 'a> { ... }
 impl<T> Mutex<T> {
-    pub fn lock<'a>(&self) -> LockResult<MutexGuard<'a, T>>;
+    pub fn lock<'a>(&'a self) -> MutexGuard<'a, T>;
 }
 
-struct MutexGuard<'a, T: 'a> { /* private fields */ }
-
-impl<T: ?Sized> Deref for MutexGuard<'_, T> {
+impl<T> std::ops::DerefMut for MutexGuard<'_, T> {
     type Target = T;
+    fn deref_mut(&mut self) -> &mut T { ... }
+}
+impl<T> std::ops::Drop for T { ... } 
+```
 
-    fn deref(&self) -> &T {
-        unsafe { &*self.lock.data.get() }
+- Mutex can only be accessed when locked.
+- Mutex automaticly unlocked when guard goes out of scope.
+- Lifetime of `&mut T` given out tied to lifetime of guard.
+
+
+## Rust: `unsafe`
+
+```rust
+struct MutexGuard<'a, T: 'a> { 
+    // INV: self.lock is locked by us
+    lock: &'a Mutex<T>
+}
+impl<T: ?Sized> std::ops::DerefMut for MutexGuard<'_, T> {
+    type Target = T;
+    fn deref_mut(&mut self) -> &mut T {
+        // SAFETY: we hold the lock, so no-one else could access data
+        unsafe { &mut *self.lock.data.get() }
     }
 }
 ```
+
+- `unsafe` blocks let you write code the compiller can't check upholds gaurentees
+- You have to uphold them yourself
 
 ## Rust: Closures
 
@@ -192,76 +276,6 @@ dbg!(add_x.call((3,))); // [src/main.rs:12:5] add_x.call((3,)) = 13
 - `FnOnce`: Takes captures by value (`self`)
 
 `Fn` implies `FnMut`, and `FnMut` implies `FnOnce`
-
-## Rust: `unsafe`
-
-- `unsafe` is used to build safe abstractions like `Mutex`, `Vec` and `Thread`
-- Lets you:
-    1. Call `unsafe` methods
-    2. Dereference raw pointers
-    3. Implement an `unsafe` trait.
-- Allows bypassing gaurentees that the compiller normally ensures
-
-```rust
-unsafe fn transmute<Src, Dst>(src: Src) -> Dst { /**/ }
-unsafe trait Send { }
-```
-
-# Background: `verona-rt`
-
-## `verona-rt`
-
-- C++ implementatation of BoC
-- 2 API's:
-    - `verona::rt`,
-    - `verona::cpp`, a C++ DSL to write BoC code in C++
-
-## Using `verona-rt::cpp`
-
-```c++
-auto f = verona::cpp::make_cown<std::string>("hello");
-
-verona::cpp::when(f) << [](auto f) {
-    f->push_back('!');
-    std::cout << *f << '\n';
-};
-```
-
-## Data-race in `verona-rt::cpp`.
-
-```c++
-cown_ptr<int> my_cown = make_cown<int>(10);
-int* escape_data;
-when(my_cown) << [&escape_data](acquired_cown<int> my_cown) {
-    escape_data = &*my_cown;
-};
-sleep(3); // Wait for behaviour to run
-*escape_data += 10; // Modifies cown without acquiring!!!
-```
-
-
-## Data-race in `verona-rt::cpp`.
-
-```cpp
-std::vector<int> my_vec{};
-auto cown1 = make_cown<int>(42);
-auto cown2 = make_cown<int>(12);
-
-when(cown1) << [&my_vec](auto cown1) {
-    for (int i = 0; i < 1000; i++)
-        my_vec.push_back(*cown1);
-};
-
-when(cown2) << [&my_vec](auto cown2) {
-    for (int i = 0; i < 1000; i++)
-        my_vec.push_back(*cown2);
-};
-
-when(cown1, cown2) << [&my_vec](auto cown1, auto cown2) {
-    for (int& i : my_vec)
-        std::cout << i << "\n";
-};
-```
 
 # Boxcars
 
@@ -308,6 +322,19 @@ impl<'a, T> std::ops::Deref for AcquiredCown<'a, T> {
 }
 impl<'a, T> std::ops::DerefMut for AcquiredCown<'a, T> { ... }
 ```
+
+
+## Error Prevented: Holding Reference to Object in Cown
+
+```rust
+let mut my_vec = vec![1, 2, 3];
+let vec_ref: &mut Vec<i32> = &mut my_vec;
+let cown = Cown::new(my_vec);
+vec_ref.push(4);
+```
+
+![](./img/error5.png)
+
 
 ## Boxcars: API
 
@@ -396,36 +423,54 @@ when(&idx_2, move |idx_2| { dbg!(my_vec[*idx_2]); });
 
 ## Boxcars: C++ FFI
 
+- Underlying `verona-rt` library relies extensively on templates
+    - Every cown templated on the type it contains
+    - Every behaviour templated on the closure it runs 
 - Rust can make FFI calls to C, but not C++
-- Rust can't cause C++ template instantiation
-    - All 
+- We choose what templates to instantiate once, without knowledge of user-defined types
 
 ## Boxcars: Layered design
 
 1. `verona::rt`
+    - Untyped `verona::rt::Cown`*
 2. `boxcars_*` C++ binding functions
 3. unsafe `boxcars` internals
 4. safe `boxcars` user-facing API.
+    - Typed `Cown<T>` and `AcquiredCown<T>`
 
-## Boxcars: Cown API
+## Cown Creation Dance
+
+1. Rust: Find static pointer to desciptor
+    
+    This contains:
+
+    - Destructor function pointer
+    - Total allocation size
+2. C++: Allocate object with that size
+3. C++: Initialize non-type-specific parts:
+
+    - Pointer to descriptor for destruction/inspection
+    - Reference count
+    - Scheduling state
+4. Rust: Moves rust value into cown's allocation
 
 ```rust
-struct Cown<T> { /**/ }
-
-impl<T> Cown<T> {
-    fn new(value: T) -> Self { /**/ }
-}
+verona::rt::Cown* boxcars_allocate_cown(verona::rt::Descriptor* desc)
 ```
 
 ## Cown Layout
 
 ![](./img/cown-layout.png)
 
-## Cown Creation
+## Cown Layout
 
-```rust
-verona::rt::Cown* boxcars_allocate_cown(verona::rt::Cown* desc)
-```
+- Rust-side knows:
+    - `rt::Cown`/`rt::Object::Header` size
+        - but not their contents!
+    - `rt::Descriptor` size & contents
+- C++ side knows:
+    - Nothing of the Rust side. 
+
 
 ## Cown Lifecycle
 
@@ -444,19 +489,124 @@ impl<T> std::ops::Drop for Cown<T> {
 ```
 
 
+## Behaviour: Scheduling
+
+```cpp
+void boxcars_sched_lambda(
+    void (*f)(Work*),
+    Cown** cowns,
+    size_t n_cowns,
+    void* payload,
+    size_t payload_size)
+```
+
+1. Rust creates trampoline function pointer
+2. Rust passes trampoline, cown array and captures to C++
+3. C++ allocates behaviour large enough
+4. C++ stores function pointer, cowns, and captures in the behaviours
+5. C++ schedules behaviour to be run when cown's acquired
+
+
+## Behaviour: Layout
+
+![](img/behaviour-layout(4).png)
+
+## Behaviour: Execution
+
+1. C++ acquires all cowns
+2. C++ calls function pointer in behaviour on that behaviour
+3. Rust trampoline retreives cowns and captures
+    - This is done via call into C++ with outpointers
+4. Rust trampoline invokes underlying closure
+5. C++ makes closures availble, and free's allocation
+
+Rust knows only how `Slot`s are laid out, but not how `BehaviourCore` or `Work` are.
+
 # Benchmarks
 
 ## Benchmarks: Create Cowns
 
-![](./plot/create_cown.pdf)
+![](./plot/create_cown.pdf){ height=90% }
 
 ## Benchmarks: Schedule Behaviours
 
-![](./plot/schedule_behaviours.pdf)
+![](./plot/schedule_behaviours.pdf){ height=90% }
+
+## Benchmarks: Fibonacci
+
+![](./plot/fibonacci.pdf){ height=90% }
+
+## Fibonacci: Verona Uncareful
+
+```cpp
+void par_fib_uncareful(uint32_t n, cown_ptr<uint32_t> result) {
+  if (n <= 4) {
+    when(result) << [n](auto r) { *r = sequential_fib(n); };
+  } else {
+    auto f1 = make_cown<uint32_t>(0);
+    par_fib_uncareful(n - 1, f1);
+    par_fib_uncareful(n - 2, result);
+    when(result, f1) << [](auto r, auto f) { *r += f; };
+  }
+}
+```
+
+## Fibonacci: Verona Careful
+
+```cpp
+void par_fib_careful(uint32_t n, cown_ptr<uint32_t> &result) {
+  if (n <= 4) {
+    when(result) << [n](auto r) { *r = sequential_fib(n); };
+  } else {
+    auto f1 = make_cown<uint32_t>(0);
+    par_fib_careful(n - 1, f1);
+    par_fib_careful(n - 2, result);
+    when(result, f1) << [](auto r, auto f) { *r += f; };
+  }
+}
+```
+
+## Fibonacci: Boxcars Uncareful
+
+```rust
+fn par_fib_uncareful(n: u32, result: Cown<u32>) {
+    if n <= 4 {
+        when(&result, move |mut r| *r = sequential_fib(n));
+    } else {
+        let f1 = Cown::new(0);
+        par_fib_uncareful(n - 1, f1.clone());
+        par_fib_uncareful(n - 2, result.clone());
+        when((&result, &f1), |(mut r, f)| *r += *f);
+    }
+}
+```
+
+
+## Fibonacci: Boxcars Careful
+
+```rust
+fn par_fib_careful(n: u32, result: &Cown<u32>) {
+    if n <= 4 {
+        when(result, move |mut r| *r = sequential_fib(n));
+    } else {
+        let f1 = Cown::new(0);
+        par_fib_careful(n - 1, &f1);
+        par_fib_careful(n - 2, result);
+        when((result, &f1), |(mut r, f)| *r += *f);
+    }
+}
+```
+
+## Conclusion
+
+- Misuse Reisistant Rust API for Behaviour Oriented Concurrency
+- Rust bindings to `verona-rt` to implement this
 
 ## Future Work
 
-- BoC extensions:
+- Port BoC extensions to `boxcars`:
     - Read-only acquired cowns
     - Atomic scheduling of multiple behaviours
-    - 
+    - Notifications
+- Sharing cowns between Rust and C++
+- Medium-scale software in BoC

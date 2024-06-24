@@ -106,7 +106,7 @@ when(cown) << [](acquired_cown<std::sting> cown) {
 Type system used to model BoC
 
 - `cown_ptr<T>`: Forbids access
-- `acqured_cown<T>`: Allows access
+- `acquired_cown<T>`: Allows access
 
 ## Accessing Cown's Data Outside of Behaviour
 
@@ -217,7 +217,7 @@ impl<T> std::ops::Drop for T { ... }
 ```
 
 - Mutex can only be accessed when locked.
-- Mutex automaticly unlocked when guard goes out of scope.
+- Mutex automatically unlocked when guard goes out of scope.
 - Lifetime of `&mut T` given out tied to lifetime of guard.
 
 
@@ -237,7 +237,7 @@ impl<T: ?Sized> std::ops::DerefMut for MutexGuard<'_, T> {
 }
 ```
 
-- `unsafe` blocks let you write code the compiller can't check upholds gaurentees
+- `unsafe` blocks let you write code the compiler can't check upholds guarantees
 - You have to uphold them yourself
 
 ## Rust: Closures
@@ -440,7 +440,7 @@ when(&idx_2, move |idx_2| { dbg!(my_vec[*idx_2]); });
 
 ## Cown Creation Dance
 
-1. Rust: Find static pointer to desciptor
+1. Rust: Find static pointer to descriptor
     
     This contains:
 
@@ -515,10 +515,10 @@ void boxcars_sched_lambda(
 
 1. C++ acquires all cowns
 2. C++ calls function pointer in behaviour on that behaviour
-3. Rust trampoline retreives cowns and captures
+3. Rust trampoline retrieves cowns and captures
     - This is done via call into C++ with outpointers
 4. Rust trampoline invokes underlying closure
-5. C++ makes closures availble, and free's allocation
+5. C++ makes closures available, and free's allocation
 
 Rust knows only how `Slot`s are laid out, but not how `BehaviourCore` or `Work` are.
 

@@ -1,0 +1,27 @@
+[package]
+name = "boc-sys"
+version = "0.0.1"
+edition = "2021"
+description = "Implementation details of boc."
+# homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cmake = "0.1.50"
+
+[build-dependencies]
+cmake = "0.1.50"
+
+[features]
+systematic_testing = []
+flight_recorder = []
+snmalloc_tracing = []
+
+sanitizer_address = ["__any_sanitizer"]
+sanitizer_thread = ["__any_sanitizer"]
+
+# Only for cfg attrs.
+__any_sanitizer = []

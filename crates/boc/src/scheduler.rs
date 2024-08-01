@@ -1,0 +1,129 @@
+use std::sync::Mutex;
+
+/// Access to the verona schedular.
+///
+/// ## Global singleton
+///
+/// In each program there is exactly one global schedular. This is a big pile
+/// of global state, that must be carefully managed.
+///
+/// TODO: Understand init/run well.
+use boc_sys as ffi;
+use ffi::scheduler_get;
+
+use crate::log;
+
+fn get() -> ffi::Scheduler {
+    // TODO: Is it worth caching the returned pointer?
+
+    // SAFETY: scheduler_get is safe to call.
+    unsafe { ffi::scheduler_get() }
+}
+
+static SCHED_LOCK: Mutex<()> = Mutex::new(());
+
+struct DropGuard;
+impl Drop for DropGuard {
+    fn drop(&mut self) {
+        unsafe { ffi::scheduler_run(get()) }
+    }
+}
+
+pub fn with_scheduler<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    // TODO: Correct default?
+    with_inner(f, true, 1)
+}
+pub fn with_leak_detector<T>(f: impl FnOnce() -> T) -> T {
+    with_inner(f, true, 1)
+}
+
+pub fn with_n_threads<T: Send>(n_threads: usize, f: impl FnOnce() -> T + Send) -> T {
+    with_inner(f, false, n_threads)
+}
+
+fn with_inner<T, F: FnOnce() -> T>(f: F, detect_leaks: bool, n_threads: usize) -> T {
+    let lock = SCHED_LOCK.lock();
+
+    unsafe {
+        ffi::scheduler_init(scheduler_get(), n_threads);
+
+        if detect_leaks {
+            ffi::schedular_set_detect_leaks(true);
+        }
+    }
+
+    // Use a drop guard to clean up scheduler resources even in the case that
+    // The closure panics.
+    let dg = DropGuard;
+    let result = f();
+    drop(dg); // Calls Scheduler.run
+
+    if detect_leaks {
+        unsafe {
+            log(c"running leak detector");
+            if ffi::schedular_has_leaks() {
+                panic!("leaks detected");
+            }
+            ffi::schedular_set_detect_leaks(false)
+        }
+    }
+
+    drop(lock);
+
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_run() {
+        with_scheduler(|| {});
+    }
+
+    #[test]
+    fn run_from_multi_threads() {
+        stdx::thread::scope(|s| {
+            for _ in 0..10 {
+                s.spawn(|| {
+                    for _ in 0..100 {
+                        with_scheduler(|| {});
+                    }
+                });
+            }
+        });
+    }
+
+    #[test]
+    #[ignore = "https://github.com/aDotInTheVoid/boxcars/issues/4"]
+    fn panic_safe() {
+        stdx::thread::scope(|s| {
+            for _ in 0..10 {
+                s.spawn(|| {
+                    for _ in 0..10 {
+                        let r = std::panic::catch_unwind(|| with_scheduler(|| panic!("lol lmao")));
+                        let r_err = r.unwrap_err();
+                        let s = r_err.downcast::<&str>().unwrap();
+                        assert_eq!(&**s, "lol lmao");
+                    }
+                });
+            }
+        })
+    }
+
+    // #[test]
+    // fn concurrent_leak_detector() {
+    //     fn do_a_clone() {
+    //         _ = cown::CownPtr::new(101).clone();
+    //     }
+
+    //     for _ in 0..1000 {
+    //         let t1 = std::thread::spawn(|| with(|| do_a_clone()));
+    //         let t3 = std::thread::spawn(|| with_leak_detector(|| do_a_clone()));
+
+    //         t1.join().unwrap();
+    //         t3.join().unwrap();
+    //     }
+    // }
+}

@@ -1,6 +1,6 @@
 [submodule "verona-rt"]
-	path = crates/verona-rt-sys/verona-rt
+	path = crates/boc-sys/verona-rt
 	url = https://github.com/microsoft/verona-rt.git
 [submodule "crates/verona-rt-sys/snmalloc"]
-	path = crates/verona-rt-sys/snmalloc
+	path = crates/boc-sys/snmalloc
 	url = https://github.com/microsoft/snmalloc

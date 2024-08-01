@@ -18,7 +18,7 @@ clean:
 # Build presentation pdf
 pres:
     mkdir -p dist
-    pandoc ./presentation.md -o ./pres.pdf -t beamer
+    pandoc ./presentation.md -o ./dist/pres.pdf -t beamer
 
 longbench:
     cargo bench -p boxcars --bench micro -- --test

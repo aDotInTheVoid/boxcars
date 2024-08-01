@@ -87,7 +87,9 @@ However, to get datarace and deadlock freedom, host languages must:
 
 - C++ implementation of BoC
 - 2 API's:
-    - `verona::rt`,
+    - `verona::rt`, implements the runtime itself, but 
+        - Manually update refcounts
+        - Manually associate data with cowns.
     - `verona::cpp`, a C++ DSL to write BoC code in C++
 
 ## Using `verona-rt::cpp`
@@ -356,18 +358,6 @@ impl<A: 'static, B: 'static> CownCollection for (&Cown<A>, &Cown<B>) {
 }
 ```
 
-## Error Prevented: Aliasing Captures
-
-```rust
-let mut my_vec = Vec::<i32>::new();
-let cown_1 = Cown::new(10);
-let cown_2 = Cown::new(20);
-
-when(&cown_1, |cown_1| my_vec.push(*cown_1));
-when(&cown_2, |cown_2| my_vec.push(*cown_2));
-```
-
-![](./img/error1.png)
 
 ## Error Prevented: Escaping the Reference
 
@@ -421,6 +411,19 @@ when(&idx_2, move |idx_2| { dbg!(my_vec[*idx_2]); });
 ![](./img/error4.png)
 
 
+## Error Prevented: Aliasing Captures
+
+```rust
+let mut my_vec = Vec::<i32>::new();
+let cown_1 = Cown::new(10);
+let cown_2 = Cown::new(20);
+
+when(&cown_1, |cown_1| my_vec.push(*cown_1));
+when(&cown_2, |cown_2| my_vec.push(*cown_2));
+```
+
+![](./img/error1.png)
+
 ## Boxcars: C++ FFI
 
 - Underlying `verona-rt` library relies extensively on templates
@@ -433,7 +436,7 @@ when(&idx_2, move |idx_2| { dbg!(my_vec[*idx_2]); });
 
 1. `verona::rt`
     - Untyped `verona::rt::Cown`*
-2. `boxcars_*` C++ binding functions
+2. `boxcars_*` C binding functions
 3. unsafe `boxcars` internals
 4. safe `boxcars` user-facing API.
     - Typed `Cown<T>` and `AcquiredCown<T>`
